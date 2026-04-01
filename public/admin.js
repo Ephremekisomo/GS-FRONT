@@ -324,14 +324,14 @@ async function editAlert(alertId) {
                 <label>Assigner a</label>
                 <select id="edit-alert-assigned">
                     <option value="">Non assigne</option>
-                    <option value="poste1" ${alert.assigned_to === 'poste1' ? 'selected' : ''}>Police</option>
-                    <option value="poste2" ${alert.assigned_to === 'poste2' ? 'selected' : ''}>Pompiers</option>
-                    <option value="poste3" ${alert.assigned_to === 'poste3' ? 'selected' : ''}>Ambulance</option>
-                    <option value="poste4" ${alert.assigned_to === 'poste4' ? 'selected' : ''}>Protection civile</option>
-                    <option value="poste5" ${alert.assigned_to === 'poste5' ? 'selected' : ''}>Gendarmerie</option>
-                    <option value="poste6" ${alert.assigned_to === 'poste6' ? 'selected' : ''}>Intelligence</option>
-                    <option value="poste7" ${alert.assigned_to === 'poste7' ? 'selected' : ''}>Administration</option>
-                    <option value="poste8" ${alert.assigned_to === 'poste8' ? 'selected' : ''}>Urgence majeurs</option>
+                    <option value="police" ${['police','poste1'].includes(alert.assigned_role) || alert.assigned_to === 'poste1' ? 'selected' : ''}>Police</option>
+                    <option value="pompiers" ${['pompiers','poste2'].includes(alert.assigned_role) || alert.assigned_to === 'poste2' ? 'selected' : ''}>Pompiers</option>
+                    <option value="ambulance" ${['ambulance','poste3'].includes(alert.assigned_role) || alert.assigned_to === 'poste3' ? 'selected' : ''}>Ambulance</option>
+                    <option value="protection civile" ${['protection civile','poste4'].includes(alert.assigned_role) || alert.assigned_to === 'poste4' ? 'selected' : ''}>Protection civile</option>
+                    <option value="police" ${['police','poste5'].includes(alert.assigned_role) || alert.assigned_to === 'poste5' ? 'selected' : ''}>Gendarmerie</option>
+                    <option value="centre_securite" ${['centre_securite','poste6'].includes(alert.assigned_role) || alert.assigned_to === 'poste6' ? 'selected' : ''}>Intelligence</option>
+                    <option value="admin" ${['admin','poste7'].includes(alert.assigned_role) || alert.assigned_to === 'poste7' ? 'selected' : ''}>Administration</option>
+                    <option value="admin" ${['admin','poste8'].includes(alert.assigned_role) || alert.assigned_to === 'poste8' ? 'selected' : ''}>Urgence majeurs</option>
                 </select>
             </div>
             <button type="submit" class="btn-primary">
@@ -875,19 +875,19 @@ async function sendVoiceMessage(audioBlob) {
 
 function renderPosts() {
     const posts = [
-        { id: 'poste1', name: 'Police', icon: 'fa-user-police', color: '#3498db' },
-        { id: 'poste2', name: 'Pompiers', icon: 'fa-fire-extinguisher', color: '#e74c3c' },
-        { id: 'poste3', name: 'Ambulance', icon: 'fa-ambulance', color: '#27ae60' },
-        { id: 'poste4', name: 'Protection civile', icon: 'fa-hard-hat', color: '#f39c12' },
-        { id: 'poste5', name: 'Gendarmerie', icon: 'fa-shield-alt', color: '#9b59b6' },
-        { id: 'poste6', name: 'Intelligence', icon: 'fa-user-secret', color: '#34495e' },
-        { id: 'poste7', name: 'Administration', icon: 'fa-building', color: '#1abc9c' },
+        { id: 'poste1', role: 'police', name: 'Police', icon: 'fa-shield-alt', color: '#3498db' },
+        { id: 'poste2', role: 'pompiers', name: 'Pompiers', icon: 'fa-fire-extinguisher', color: '#e74c3c' },
+        { id: 'poste3', role: 'ambulance', name: 'Ambulance', icon: 'fa-ambulance', color: '#27ae60' },
+        { id: 'poste4', role: 'protection civile', name: 'Protection civile', icon: 'fa-hard-hat', color: '#f39c12' },
+        { id: 'poste5', role: 'police', name: 'Gendarmerie', icon: 'fa-shield-alt', color: '#9b59b6' },
+        { id: 'poste6', role: 'centre_securite', name: 'Intelligence', icon: 'fa-user-secret', color: '#34495e' },
+        { id: 'poste7', role: 'admin', name: 'Administration', icon: 'fa-building', color: '#1abc9c' },
         { id: 'poste8', name: 'Urgence majeurs', icon: 'fa-exclamation-triangle', color: '#e67e22' }
     ];
     
     const container = document.getElementById('posts-grid');
     container.innerHTML = posts.map(post => {
-        const postAlerts = alerts.filter(a => a.assigned_to === post.id);
+        const postAlerts = alerts.filter(a => a.assigned_role === post.role || a.assigned_to === post.id);
         const active = postAlerts.filter(a => a.status === 'active').length;
         const inProgress = postAlerts.filter(a => a.status === 'en_cours').length;
         const resolved = postAlerts.filter(a => a.status === 'resolu').length;

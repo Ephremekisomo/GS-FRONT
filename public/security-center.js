@@ -160,7 +160,7 @@ function renderAlerts() {
             <div class="alert-item-meta">
                 ${alert.nom} ${alert.prenom} - ${formatDate(alert.created_at)}
                 <span class="alert-item-priority">P${alert.priority}</span>
-                ${alert.assigned_to ? `<span class="alert-item-assigned">${getPosteLabel(alert.assigned_to)}</span>` : ''}
+                ${alert.assigned_to ? `<span class="alert-item-assigned">${getPosteLabel(alert.assigned_role || alert.assigned_to)}</span>` : ''}
             </div>
             <div class="alert-item-actions">
                 <button class="btn-details" data-id="${alert.id}" title="Voir les details">
@@ -1200,21 +1200,27 @@ function getPosteLabel(poste) {
         'poste5': 'Gendarmerie',
         'poste6': 'Intelligence',
         'poste7': 'Administration',
-        'poste8': 'Urgence majeurs'
+        'poste8': 'Urgence majeurs',
+        'police': 'Police',
+        'pompiers': 'Pompiers',
+        'ambulance': 'Ambulance',
+        'protection civile': 'Protection civile',
+        'centre_securite': 'Centre de securite',
+        'admin': 'Admin'
     };
     return labels[poste] || poste;
 }
 
 // Map emergency types to appropriate postes
 const emergencyToPoste = {
-    'Agression': 'poste1',         // Police
-    'Accident': 'poste1',          // Police
-    'Incendie': 'poste2',          // Pompiers
-    'Urgence Medicale': 'poste3',  // Ambulance
-    'Violence': 'poste5',          // Gendarmerie
-    'Activite Suspecte': 'poste6', // Intelligence
-    'Manifestation': 'poste1',      // Police
-    'Catastrophe Naturelle': 'poste4' // Protection civile
+    'Agression': 'police',
+    'Accident': 'police',
+    'Incendie': 'pompiers',
+    'Urgence Medicale': 'ambulance',
+    'Violence': 'police',
+    'Activite Suspecte': 'centre_securite',
+    'Manifestation': 'police',
+    'Catastrophe Naturelle': 'protection civile'
 };
 
 // Get appropriate poste for emergency type
