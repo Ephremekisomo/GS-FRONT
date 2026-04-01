@@ -459,16 +459,31 @@ document.getElementById('btn-sound-toggle').addEventListener('click', () => {
 });
 
 function initSocket() {
-    socket = io(SOCKET_URL);
+    if (socket && socket.connected) return;
+    
+    socket = io(SOCKET_URL, {
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        reconnectionAttempts: Infinity,
+        transports: ['websocket', 'polling']
+    });
     
     socket.on('connect', () => {
         console.log('Security center connected');
         socket.emit('join-room', 'security-center');
     });
+
+    socket.on('reconnect', () => {
+        console.log('Security center reconnected');
+        socket.emit('join-room', 'security-center');
+        loadAlerts();
+        loadStats();
+    });
     
     socket.on('new-alert', (alert) => {
         console.log('New alert received:', alert);
-        startAlertSound(); // Play sound in loop
+        startAlertSound();
         showToast(`Nouvelle alerte: ${alert.type_nom}`, 'warning');
         loadAlerts();
         loadStats();
@@ -480,22 +495,17 @@ function initSocket() {
         loadStats();
     });
     
-    // Listen for reinforcement calls
     socket.on('reinforcement-call', (data) => {
         console.log('Reinforcement call received:', data);
         showReinforcementAlert(data);
     });
     
-    // Listen for new chat messages
     socket.on('chat-message', (data) => {
-        // Check if message is from current conversation
         if (currentChatUser && currentChatUser.id === data.sender_id) {
-            // Add message to current conversation
             const messagesContainer = document.getElementById('admin-chat-messages');
             const messageDiv = document.createElement('div');
             messageDiv.className = 'message received';
             
-            // Handle voice messages
             let messageContent = data.message;
             if (data.audio_path) {
                 messageContent = `<audio controls src="${data.audio_path}" class="voice-message"></audio>`;
@@ -514,10 +524,8 @@ function initSocket() {
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
         
-        // Show notification if message is from different user or panel is closed
         if (!currentChatUser || currentChatUser.id !== data.sender_id) {
             showChatNotification();
-            // Also auto-open panel for new messages
             const panel = document.getElementById('admin-chat-panel');
             if (!panel.classList.contains('active')) {
                 panel.classList.add('active');
@@ -525,18 +533,21 @@ function initSocket() {
             }
         }
         
-        // Reload users list to show new message
         loadChatUsers();
     });
     
-    // Listen for deleted messages
     socket.on('chat-message-deleted', (data) => {
-        // Reload chat if open
         if (currentChatUser) {
             loadMessages(currentChatUser.id);
         }
         loadChatUsers();
     });
+
+    setInterval(() => {
+        if (socket && socket.connected) {
+            socket.emit('ping-server');
+        }
+    }, 30000);
 }
 
 // =====================

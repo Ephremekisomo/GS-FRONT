@@ -1005,18 +1005,39 @@ document.getElementById('enable-2fa-form').addEventListener('submit', async (e) 
 // =====================
 
 function initSocket() {
-    socket = io(SOCKET_URL);
+    if (socket && socket.connected) return;
+    
+    socket = io(SOCKET_URL, {
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        reconnectionAttempts: Infinity,
+        transports: ['websocket', 'polling']
+    });
     
     socket.on('connect', () => {
         console.log('Connected to socket server');
     });
-    
-    socket.on('alert-updated', (data) => {
-        // Reload history when an alert is updated
-        loadHistory();
+
+    socket.on('reconnect', () => {
+        console.log('Reconnected to socket server');
+        if (currentUser) {
+            loadHistory();
+        }
     });
     
-    // Initialize chat socket listeners
+    socket.on('new-alert', (data) => {
+        if (currentUser) {
+            loadHistory();
+        }
+    });
+    
+    socket.on('alert-updated', (data) => {
+        if (currentUser) {
+            loadHistory();
+        }
+    });
+    
     initChatSocket();
 }
 

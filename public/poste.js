@@ -287,14 +287,27 @@ async function loadStats() {
 // =====================
 
 function initSocket() {
-    socket = io(SOCKET_URL);
+    if (socket && socket.connected) return;
+    
+    socket = io(SOCKET_URL, {
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        reconnectionAttempts: Infinity,
+        transports: ['websocket', 'polling']
+    });
     
     socket.on('connect', () => {
         console.log('Poste connected');
     });
+
+    socket.on('reconnect', () => {
+        console.log('Poste reconnected');
+        loadAlerts();
+        loadStats();
+    });
     
     socket.on('new-alert', (data) => {
-        // New alert created - reload to check if assigned to this poste
         loadAlerts();
         loadStats();
     });
