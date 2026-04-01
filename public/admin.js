@@ -30,38 +30,10 @@ function checkAuth() {
     if (token) {
         showDashboard();
         initApp();
+    } else {
+        window.location.href = '/';
     }
 }
-
-document.getElementById('login-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
-    const telephone = document.getElementById('login-telephone').value;
-    const password = document.getElementById('login-password').value;
-    
-    try {
-        const response = await fetch(`${API_URL}/api/auth/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ telephone, password })
-        });
-        
-        const data = await response.json();
-        
-        if (response.ok && data.user && data.user.role === 'admin') {
-            localStorage.setItem('admin_token', data.token);
-            currentUser = data.user;
-            showDashboard();
-            initApp();
-        } else if (response.ok) {
-            showToast('Acces reserve aux administrateurs', 'error');
-        } else {
-            showToast(data.error || 'Erreur de connexion', 'error');
-        }
-    } catch (error) {
-        showToast('Erreur de connexion au serveur', 'error');
-    }
-});
 
 document.getElementById('btn-logout').addEventListener('click', () => {
     localStorage.removeItem('admin_token');
@@ -69,8 +41,7 @@ document.getElementById('btn-logout').addEventListener('click', () => {
     localStorage.removeItem('poste_token');
     currentUser = null;
     if (socket) socket.disconnect();
-    showSection('login-section');
-    showToast('Deconnexion reussie', 'success');
+    window.location.href = '/';
 });
 
 function showSection(sectionId) {
@@ -603,6 +574,11 @@ async function editUser(userId) {
                 <select id="edit-user-role">
                     <option value="citoyen" ${user.role === 'citoyen' ? 'selected' : ''}>Citoyen</option>
                     <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
+                    <option value="police" ${user.role === 'police' ? 'selected' : ''}>Police</option>
+                    <option value="pompiers" ${user.role === 'pompiers' ? 'selected' : ''}>Pompiers</option>
+                    <option value="protection civile" ${user.role === 'protection civile' ? 'selected' : ''}>Protection civile</option>
+                    <option value="ambulance" ${user.role === 'ambulance' ? 'selected' : ''}>Ambulance</option>
+                    <option value="centre_securite" ${user.role === 'centre_securite' ? 'selected' : ''}>Centre de securite</option>
                 </select>
             </div>
             <div class="form-group">

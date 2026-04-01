@@ -65,57 +65,10 @@ function checkAuth() {
         }
         showDashboard();
         initApp();
+    } else {
+        window.location.href = '/';
     }
 }
-
-document.getElementById('login-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
-    const posteName = document.getElementById('login-poste').value.trim();
-    const password = document.getElementById('login-password').value;
-    
-    // Find the poste ID based on the name entered
-    let matchedPosteId = null;
-    let displayName = posteName;
-    
-    // First try exact match (case insensitive)
-    for (const [posteId, name] of Object.entries(posteNames)) {
-        if (name.toLowerCase() === posteName.toLowerCase()) {
-            matchedPosteId = posteId;
-            displayName = name;
-            break;
-        }
-    }
-    
-    // If no exact match, check if the entered name contains the poste name
-    if (!matchedPosteId) {
-        for (const [posteId, name] of Object.entries(posteNames)) {
-            if (name.toLowerCase().includes(posteName.toLowerCase()) || 
-                posteName.toLowerCase().includes(name.toLowerCase())) {
-                matchedPosteId = posteId;
-                displayName = name;
-                break;
-            }
-        }
-    }
-    
-    if (!matchedPosteId) {
-        showToast('Poste non reconnu. Ex: Police, Pompiers, Ambulance...', 'error');
-        return;
-    }
-    
-    // Simple password check - password should match the poste name
-    if (password === 'poste123') {
-        selectedPoste = matchedPosteId;
-        const token = btoa(JSON.stringify({ poste: matchedPosteId, role: 'poste' }));
-        localStorage.setItem('poste_token', token);
-        localStorage.setItem('poste_name', displayName);
-        showDashboard();
-        initApp();
-    } else {
-        showToast('Mot de passe incorrect', 'error');
-    }
-});
 
 document.getElementById('btn-logout').addEventListener('click', () => {
     localStorage.removeItem('poste_token');
@@ -124,8 +77,7 @@ document.getElementById('btn-logout').addEventListener('click', () => {
     localStorage.removeItem('admin_token');
     currentUser = null;
     selectedPoste = null;
-    showSection('login-section');
-    showToast('Deconnexion reussie', 'success');
+    window.location.href = '/';
 });
 
 function showSection(sectionId) {

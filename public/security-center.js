@@ -33,38 +33,10 @@ function checkAuth() {
     if (token) {
         showDashboard();
         initApp();
+    } else {
+        window.location.href = '/';
     }
 }
-
-document.getElementById('login-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
-    const telephone = document.getElementById('login-telephone').value;
-    const password = document.getElementById('login-password').value;
-    
-    try {
-        const response = await fetch(`${API_URL}/api/auth/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ telephone, password })
-        });
-        
-        const data = await response.json();
-        
-        if (response.ok && data.user && data.user.role === 'admin') {
-            localStorage.setItem('admin_token', data.token);
-            currentUser = data.user;
-            showDashboard();
-            initApp();
-        } else if (response.ok) {
-            showToast('Acces reserve aux administrateurs', 'error');
-        } else {
-            showToast(data.error || 'Erreur de connexion', 'error');
-        }
-    } catch (error) {
-        showToast('Erreur de connexion au serveur', 'error');
-    }
-});
 
 document.getElementById('btn-logout').addEventListener('click', () => {
     localStorage.removeItem('admin_token');
@@ -72,8 +44,7 @@ document.getElementById('btn-logout').addEventListener('click', () => {
     localStorage.removeItem('poste_token');
     currentUser = null;
     if (socket) socket.disconnect();
-    showSection('login-section');
-    showToast('Deconnexion reussie', 'success');
+    window.location.href = '/';
 });
 
 function showSection(sectionId) {
@@ -151,7 +122,7 @@ async function loadAlerts() {
         
         if (response.status === 403 || response.status === 401) {
             localStorage.removeItem('admin_token');
-            showSection('login-section');
+            window.location.href = '/';
             showToast('Session expiree, veuillez vous reconnecter', 'error');
             return;
         }
@@ -370,7 +341,7 @@ document.querySelectorAll('.btn-status').forEach(btn => {
             
             if (response.status === 403 || response.status === 401) {
                 localStorage.removeItem('admin_token');
-                showSection('login-section');
+                window.location.href = '/';
                 showToast('Session expiree, veuillez vous reconnecter', 'error');
                 return;
             }
@@ -407,7 +378,7 @@ async function loadStats() {
         
         if (response.status === 403 || response.status === 401) {
             localStorage.removeItem('admin_token');
-            showSection('login-section');
+            window.location.href = '/';
             showToast('Session expiree, veuillez vous reconnecter', 'error');
             return;
         }
@@ -629,7 +600,7 @@ async function loadChatUsers() {
         
         if (response.status === 403 || response.status === 401) {
             localStorage.removeItem('admin_token');
-            showSection('login-section');
+            window.location.href = '/';
             showToast('Session expiree, veuillez vous reconnecter', 'error');
             return;
         }
@@ -700,7 +671,7 @@ async function loadMessages(userId) {
         
         if (response.status === 403 || response.status === 401) {
             localStorage.removeItem('admin_token');
-            showSection('login-section');
+            window.location.href = '/';
             showToast('Session expiree, veuillez vous reconnecter', 'error');
             return;
         }
@@ -777,7 +748,7 @@ async function deleteAdminMessage(messageId) {
         
         if (response.status === 403 || response.status === 401) {
             localStorage.removeItem('admin_token');
-            showSection('login-section');
+            window.location.href = '/';
             showToast('Session expiree, veuillez vous reconnecter', 'error');
             return;
         }
@@ -832,7 +803,7 @@ document.getElementById('admin-chat-form').addEventListener('submit', async (e) 
         
         if (response.status === 403 || response.status === 401) {
             localStorage.removeItem('admin_token');
-            showSection('login-section');
+            window.location.href = '/';
             showToast('Session expiree, veuillez vous reconnecter', 'error');
             return;
         }
@@ -941,7 +912,7 @@ async function sendAdminVoiceMessage(audioBlob, extension = 'webm') {
         
         if (response.status === 403 || response.status === 401) {
             localStorage.removeItem('admin_token');
-            showSection('login-section');
+            window.location.href = '/';
             showToast('Session expiree, veuillez vous reconnecter', 'error');
             return;
         }
@@ -1343,7 +1314,7 @@ async function assignAlertDirectly(alertId) {
         
         if (response.status === 403 || response.status === 401) {
             localStorage.removeItem('admin_token');
-            showSection('login-section');
+            window.location.href = '/';
             showToast('Session expiree, veuillez vous reconnecter', 'error');
             return;
         }
