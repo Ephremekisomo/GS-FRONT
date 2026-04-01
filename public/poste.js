@@ -120,19 +120,15 @@ async function initApp() {
 // =====================
 
 async function loadAlerts() {
-    const token = localStorage.getItem('poste_token');
-    if (!token) {
+    if (!selectedPoste) {
         alerts = [];
         renderAlerts();
         return;
     }
     
-    const posteData = JSON.parse(atob(token));
-    const poste = posteData.poste;
-    
     try {
         // Use the new endpoint to get alerts for this specific poste
-        const response = await fetch(`${API_URL}/api/alerts/poste/${poste}`);
+        const response = await fetch(`${API_URL}/api/alerts/poste/${selectedPoste}`);
         
         if (response.ok) {
             alerts = await response.json();
