@@ -6,8 +6,8 @@
 // CONFIGURATION
 // =====================
 
-const API_URL = 'https://gomasecure-backend.onrender.com';
-const SOCKET_URL = 'https://gomasecure-backend.onrender.com';
+const API_URL = 'https://gomasecures-backend.onrender.com';
+const SOCKET_URL = 'https://gomasecures-backend.onrender.com';
 
 // =====================
 // STATE
