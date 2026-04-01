@@ -45,6 +45,14 @@ const posteEmergencyTypes = {
     'poste8': ['Agression', 'Accident', 'Incendie', 'Urgence medicale', 'Catastrophe naturelle']
 };
 
+const roleToPoste = {
+    'police': 'poste1',
+    'pompiers': 'poste2',
+    'ambulance': 'poste3',
+    'protection civile': 'poste4',
+    'poste': null
+};
+
 // =====================
 // AUTHENTICATION
 // =====================
@@ -55,7 +63,13 @@ function checkAuth() {
         // Check if this is a token from citizen interface login
         try {
             const tokenData = JSON.parse(atob(token.split('.')[1]));
-            if (tokenData.role === 'poste' && tokenData.poste) {
+            const role = tokenData.role;
+            
+            // Handle new roles - map them to poste IDs
+            if (roleToPoste[role]) {
+                selectedPoste = roleToPoste[role];
+                localStorage.setItem('poste_name', posteNames[selectedPoste] || 'Poste');
+            } else if (role === 'poste' && tokenData.poste) {
                 // Token from citizen interface - extract poste info
                 selectedPoste = tokenData.poste;
                 localStorage.setItem('poste_name', posteNames[tokenData.poste] || 'Poste');

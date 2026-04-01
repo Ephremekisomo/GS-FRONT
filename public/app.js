@@ -42,11 +42,11 @@ function checkAuth() {
             // Redirect to admin panel
             localStorage.setItem('admin_token', token);
             window.location.href = '/admin.html';
-        } else if (userRole === 'security_center') {
+        } else if (userRole === 'centre_securite' || userRole === 'security_center') {
             // Redirect to security center
             localStorage.setItem('admin_token', token);
             window.location.href = '/security-center.html';
-        } else if (userRole === 'poste') {
+        } else if (['poste', 'police', 'pompiers', 'protection civile', 'ambulance'].includes(userRole)) {
             // Redirect to poste interface
             localStorage.setItem('poste_token', token);
             window.location.href = '/poste.html';
@@ -98,11 +98,11 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
                     // Redirect to admin panel
                     localStorage.setItem('admin_token', data.token);
                     window.location.href = '/admin.html';
-                } else if (currentUser.role === 'security_center') {
+                } else if (currentUser.role === 'centre_securite' || currentUser.role === 'security_center') {
                     // Redirect to security center
                     localStorage.setItem('admin_token', data.token);
                     window.location.href = '/security-center.html';
-                } else if (currentUser.role === 'poste') {
+                } else if (['poste', 'police', 'pompiers', 'protection civile', 'ambulance'].includes(currentUser.role)) {
                     // Redirect to poste interface
                     localStorage.setItem('poste_token', data.token);
                     window.location.href = '/poste.html';
@@ -144,11 +144,11 @@ document.getElementById('verify-2fa-form').addEventListener('submit', async (e) 
                 // Redirect to admin panel
                 localStorage.setItem('admin_token', data.token);
                 window.location.href = '/admin.html';
-            } else if (currentUser.role === 'security_center') {
+            } else if (currentUser.role === 'centre_securite' || currentUser.role === 'security_center') {
                 // Redirect to security center
                 localStorage.setItem('admin_token', data.token);
                 window.location.href = '/security-center.html';
-            } else if (currentUser.role === 'poste') {
+            } else if (['poste', 'police', 'pompiers', 'protection civile', 'ambulance'].includes(currentUser.role)) {
                 // Redirect to poste interface
                 localStorage.setItem('poste_token', data.token);
                 window.location.href = '/poste.html';
