@@ -1111,21 +1111,47 @@ section.active {
         align-items: flex-start;
         gap: 5px;
     }
+    
+    .chat-message {
+        max-width: 90%;
+    }
+    
+    .chat-input-area {
+        padding: 10px;
+    }
+    
+    #chat-input {
+        padding: 10px 12px;
+        font-size: 14px;
+    }
+    
+    .alert-form {
+        max-height: 95vh;
+        border-radius: 15px;
+    }
+    
+    .alert-form form {
+        padding: 15px;
+    }
 }
 
 @media (max-width: 480px) {
+    section {
+        padding: 10px;
+    }
+    
     .emergency-section {
-        padding: 20px 15px;
+        padding: 20px 10px;
     }
     
     .emergency-button {
-        width: 130px;
-        height: 130px;
+        width: 140px;
+        height: 140px;
     }
     
     .emergency-button.round {
-        width: 140px;
-        height: 140px;
+        width: 150px;
+        height: 150px;
     }
     
     .emergency-button i {
@@ -1135,6 +1161,64 @@ section.active {
     .emergency-types-grid {
         grid-template-columns: repeat(2, 1fr);
         gap: 8px;
+    }
+    
+    .emergency-type-btn {
+        padding: 8px;
+    }
+    
+    .emergency-type-btn i {
+        font-size: 20px;
+    }
+    
+    .emergency-type-btn span {
+        font-size: 9px;
+    }
+    
+    .form-group {
+        margin-bottom: 15px;
+    }
+    
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        padding: 10px 12px;
+        font-size: 14px;
+    }
+    
+    .btn-primary,
+    .btn-secondary,
+    .btn-danger {
+        padding: 12px 16px;
+        font-size: 14px;
+    }
+    
+    .alert-card {
+        border-radius: 10px;
+        padding: 10px;
+    }
+    
+    .alert-type i {
+        width: 32px;
+        height: 32px;
+        font-size: 18px;
+    }
+    
+    .alert-type span {
+        font-size: 14px;
+    }
+    
+    .logo h1 {
+        font-size: 22px;
+    }
+    
+    .logo i {
+        font-size: 48px;
+    }
+    
+    .tagline {
+        font-size: 12px;
+        margin-bottom: 20px;
     }
 }
 

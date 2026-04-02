@@ -1070,6 +1070,10 @@ section.active {
     .sidebar {
         width: 280px;
     }
+    
+    .admin-chat-panel {
+        width: 320px;
+    }
 }
 
 @media (max-width: 768px) {
@@ -1079,15 +1083,150 @@ section.active {
     
     .sidebar {
         width: 100%;
-        max-height: 300px;
+        max-height: 350px;
+        border-right: none;
+        border-bottom: 1px solid #e0e0e0;
     }
     
     .header-stats {
-        display: none;
+        gap: 8px;
+    }
+    
+    .stat-badge {
+        padding: 6px 10px;
+    }
+    
+    .stat-badge span {
+        font-size: 16px;
     }
     
     .logo-small span {
-        display: none;
+        font-size: 16px;
+    }
+    
+    .user-menu .icon-btn {
+        width: 36px;
+        height: 36px;
+        font-size: 16px;
+    }
+    
+    .admin-chat-panel {
+        width: 100%;
+        right: -100%;
+    }
+    
+    .details-panel {
+        width: 95%;
+        max-width: none;
+        border-radius: 10px;
+    }
+    
+    .action-buttons {
+        flex-direction: column;
+    }
+    
+    .btn-status {
+        width: 100%;
+    }
+    
+    .alert-item-actions {
+        flex-wrap: wrap;
+    }
+    
+    .export-buttons {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+@media (max-width: 480px) {
+    .app-header {
+        padding: 10px 12px;
+    }
+    
+    .header-content {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    
+    .header-stats {
+        order: 3;
+        width: 100%;
+        justify-content: space-between;
+    }
+    
+    .stat-badge {
+        padding: 5px 8px;
+        font-size: 11px;
+    }
+    
+    .stat-badge span {
+        font-size: 14px;
+    }
+    
+    .stat-badge small {
+        font-size: 9px;
+    }
+    
+    .logo-small {
+        font-size: 14px;
+        gap: 6px;
+    }
+    
+    .logo-small i {
+        font-size: 18px;
+    }
+    
+    .user-menu {
+        gap: 6px;
+    }
+    
+    .user-menu .icon-btn {
+        width: 32px;
+        height: 32px;
+        font-size: 14px;
+    }
+    
+    .sidebar {
+        max-height: 280px;
+    }
+    
+    .filter-section,
+    .export-section {
+        padding: 12px;
+    }
+    
+    .filter-section h3,
+    .export-section h3 {
+        font-size: 14px;
+    }
+    
+    .alerts-sidebar {
+        padding: 12px;
+    }
+    
+    .alert-item {
+        padding: 10px;
+    }
+    
+    .alert-item-type {
+        font-size: 12px;
+    }
+    
+    .alert-item-type i {
+        width: 24px;
+        height: 24px;
+        font-size: 10px;
+    }
+    
+    .chat-user-last-message {
+        max-width: 140px;
+    }
+    
+    .toast {
+        padding: 12px 20px;
+        font-size: 13px;
+        bottom: 20px;
+        max-width: 90%;
     }
 }
 

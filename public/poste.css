@@ -721,11 +721,80 @@ section.active {
         padding: 10px;
     }
     
+    .stat-badge span {
+        font-size: 22px;
+    }
+    
     .login-container {
         padding: 35px 25px;
+        max-width: 100%;
     }
     
     .main-content {
         padding: 15px;
+    }
+    
+    .alert-card {
+        padding: 15px;
+    }
+    
+    .alert-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    
+    .action-buttons {
+        flex-direction: column;
+    }
+    
+    .action-buttons button {
+        min-width: auto;
+    }
+    
+    .details-body {
+        padding: 15px;
+    }
+    
+    .btn-reinforcement {
+        padding: 10px 16px;
+        font-size: 13px;
+    }
+}
+
+@media (max-width: 480px) {
+    .logo-small {
+        font-size: 16px;
+    }
+    
+    .logo-small i {
+        font-size: 22px;
+    }
+    
+    .stat-badge {
+        padding: 8px;
+    }
+    
+    .stat-badge span {
+        font-size: 18px;
+    }
+    
+    .stat-badge small {
+        font-size: 10px;
+    }
+    
+    .alert-type i {
+        width: 32px;
+        height: 32px;
+        font-size: 14px;
+    }
+    
+    .alert-type span {
+        font-size: 14px;
+    }
+    
+    .alert-meta {
+        flex-direction: column;
+        gap: 5px;
     }
 }
