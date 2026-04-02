@@ -286,7 +286,7 @@ async function viewAlert(alertId) {
             ${alert.photo ? `
             <div class="detail-row">
                 <span class="label">Photo:</span>
-                <span class="value"><img src="${alert.photo}" alt="Photo" style="max-width: 200px; border-radius: 8px;"></span>
+                <span class="value"><img src="${API_URL}${alert.photo}" alt="Photo" style="max-width: 200px; border-radius: 8px;"></span>
             </div>
             ` : ''}
         </div>
@@ -741,7 +741,7 @@ function renderChatMessages(messages) {
         let content = msg.message;
         
         if (msg.audio_path) {
-            content = `<audio controls src="${msg.audio_path}" style="max-width: 200px;"></audio>`;
+            content = `<audio controls src="${API_URL}${msg.audio_path}" style="max-width: 200px;"></audio>`;
         }
         
         return `
