@@ -166,7 +166,7 @@ function renderAlerts() {
                 <button class="btn-details" data-id="${alert.id}" title="Voir les details">
                     <i class="fas fa-eye"></i> Details
                 </button>
-                ${alert.photo ? `<button class="btn-photo" data-photo="${alert.photo}" title="Voir la photo">
+                ${alert.photo ? `<button class="btn-photo" data-photo="${API_URL}${alert.photo}" title="Voir la photo">
                     <i class="fas fa-camera"></i> Photo
                 </button>` : ''}
                 <button class="btn-assign" data-id="${alert.id}" title="Assigner a un poste">
@@ -265,7 +265,7 @@ function showAlertDetails(alertId) {
     const photoImg = document.getElementById('alert-photo');
     if (selectedAlert.photo) {
         photoContainer.classList.remove('hidden');
-        photoImg.src = selectedAlert.photo;
+        photoImg.src = `${API_URL}${selectedAlert.photo}`;
     } else {
         photoContainer.classList.add('hidden');
     }
@@ -565,7 +565,7 @@ function initSocket() {
             
             let messageContent = data.message;
             if (data.audio_path) {
-                messageContent = `<audio controls src="${data.audio_path}" class="voice-message"></audio>`;
+                messageContent = `<audio controls src="${API_URL}${data.audio_path}" class="voice-message"></audio>`;
             }
             
             messageDiv.innerHTML = `
@@ -777,7 +777,7 @@ function renderMessages(messages) {
         // Check if this is a voice message
         let messageContent = msg.message;
         if (msg.audio_path) {
-            messageContent = `<audio controls src="${msg.audio_path}" class="voice-message"></audio>`;
+            messageContent = `<audio controls src="${API_URL}${msg.audio_path}" class="voice-message"></audio>`;
         }
         
         messageDiv.innerHTML = `

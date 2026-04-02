@@ -593,7 +593,7 @@ function renderChatMessages(messages) {
         
         // If there's an audio path, show audio player
         if (msg.audio_path) {
-            messageContent = `<audio controls src="${msg.audio_path}" class="voice-message"></audio>`;
+            messageContent = `<audio controls src="${API_URL}${msg.audio_path}" class="voice-message"></audio>`;
         }
         
         const isOwnMessage = msg.sender_id === currentUserId;
