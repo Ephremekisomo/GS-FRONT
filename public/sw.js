@@ -72,6 +72,12 @@ self.addEventListener('fetch', (event) => {
         return;
     }
     
+    // Skip all requests to external domains (backend, CDN, etc.)
+    if (requestUrl.origin !== self.location.origin) {
+        event.respondWith(fetch(event.request));
+        return;
+    }
+    
     // Skip API requests - always go to network
     if (requestUrl.pathname.startsWith('/api/')) {
         event.respondWith(
@@ -86,18 +92,6 @@ self.addEventListener('fetch', (event) => {
                     );
                 })
         );
-        return;
-    }
-    
-    // Skip /uploads/ requests - go to network directly
-    if (requestUrl.pathname.startsWith('/uploads/')) {
-        event.respondWith(fetch(event.request));
-        return;
-    }
-    
-    // Skip external backend requests - go to network directly
-    if (requestUrl.hostname.includes('render.com') || requestUrl.hostname.includes('onrender.com')) {
-        event.respondWith(fetch(event.request));
         return;
     }
     
