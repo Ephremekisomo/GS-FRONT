@@ -95,6 +95,12 @@ self.addEventListener('fetch', (event) => {
         return;
     }
     
+    // Skip external backend requests - go to network directly
+    if (requestUrl.hostname.includes('render.com') || requestUrl.hostname.includes('onrender.com')) {
+        event.respondWith(fetch(event.request));
+        return;
+    }
+    
     // For other requests, try cache first, then network
     event.respondWith(
         caches.match(event.request)
