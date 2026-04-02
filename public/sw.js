@@ -89,6 +89,12 @@ self.addEventListener('fetch', (event) => {
         return;
     }
     
+    // Skip /uploads/ requests - go to network directly
+    if (requestUrl.pathname.startsWith('/uploads/')) {
+        event.respondWith(fetch(event.request));
+        return;
+    }
+    
     // For other requests, try cache first, then network
     event.respondWith(
         caches.match(event.request)
