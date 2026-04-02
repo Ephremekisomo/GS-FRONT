@@ -8,8 +8,8 @@
 
 const API_URL = 'https://gomasecures-backend.onrender.com';
 const SOCKET_URL = 'https://gomasecures-backend.onrender.com';
-const DEFAULT_LAT = -1.6585;
-const DEFAULT_LNG = 29.2205;
+const DEFAULT_LAT = -1.6879163817734162;
+const DEFAULT_LNG = 29.2316536515724;
 
 // =====================
 // STATE
