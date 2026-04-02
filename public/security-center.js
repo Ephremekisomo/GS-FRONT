@@ -398,36 +398,83 @@ async function loadStats() {
 // SOUND
 // =====================
 
-// Alert sound function using Web Speech API - says "Urgence" in loop
+// Alert sound function - generates emergency siren using Web Audio API
+let alertAudioContext = null;
+let alertOscillators = [];
+
 function startAlertSound() {
     if (!soundEnabled) return;
     
-    stopAlertSound(); // Stop any existing sound first
+    stopAlertSound();
     
-    function playUrgenceVoice() {
-        if (!soundEnabled) return;
+    try {
+        // Create AudioContext
+        alertAudioContext = new (window.AudioContext || window.webkitAudioContext)();
         
-        try {
-            // Use Web Speech API for voice announcement
-            if ('speechSynthesis' in window) {
-                // Cancel any ongoing speech
-                window.speechSynthesis.cancel();
+        function playSiren() {
+            if (!soundEnabled || !alertAudioContext) return;
+            
+            try {
+                const now = alertAudioContext.currentTime;
+                const duration = 1.5;
                 
-                const utterance = new SpeechSynthesisUtterance('Urgence, Urgence, Urgence');
+                // First tone (rising)
+                const osc1 = alertAudioContext.createOscillator();
+                const gain1 = alertAudioContext.createGain();
+                osc1.type = 'sawtooth';
+                osc1.frequency.setValueAtTime(600, now);
+                osc1.frequency.linearRampToValueAtTime(1200, now + duration / 2);
+                gain1.gain.setValueAtTime(0.3, now);
+                gain1.gain.linearRampToValueAtTime(0, now + duration / 2);
+                osc1.connect(gain1);
+                gain1.connect(alertAudioContext.destination);
+                osc1.start(now);
+                osc1.stop(now + duration / 2);
+                alertOscillators.push(osc1);
+                
+                // Second tone (falling)
+                const osc2 = alertAudioContext.createOscillator();
+                const gain2 = alertAudioContext.createGain();
+                osc2.type = 'sawtooth';
+                osc2.frequency.setValueAtTime(1200, now + duration / 2);
+                osc2.frequency.linearRampToValueAtTime(600, now + duration);
+                gain2.gain.setValueAtTime(0.3, now + duration / 2);
+                gain2.gain.linearRampToValueAtTime(0, now + duration);
+                osc2.connect(gain2);
+                gain2.connect(alertAudioContext.destination);
+                osc2.start(now + duration / 2);
+                osc2.stop(now + duration);
+                alertOscillators.push(osc2);
+                
+            } catch (e) {
+                console.log('Siren playback failed:', e);
+            }
+        }
+        
+        playSiren();
+        alertSoundInterval = setInterval(playSiren, 3500);
+        
+    } catch (e) {
+        console.log('Audio context failed, trying speech fallback:', e);
+        // Fallback to speech synthesis
+        try {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance('Alerte urgence');
                 utterance.lang = 'fr-FR';
                 utterance.rate = 1.0;
-                utterance.pitch = 1.0;
                 utterance.volume = 1.0;
-                
                 window.speechSynthesis.speak(utterance);
+                alertSoundInterval = setInterval(() => {
+                    if (!soundEnabled) return;
+                    window.speechSynthesis.cancel();
+                    window.speechSynthesis.speak(utterance);
+                }, 4000);
             }
-        } catch (e) {
-            console.log('Voice synthesis failed:', e);
+        } catch (e2) {
+            console.log('Speech fallback also failed:', e2);
         }
     }
-    
-    playUrgenceVoice();
-    alertSoundInterval = setInterval(playUrgenceVoice, 4000); // Repeat every 4 seconds
 }
 
 function stopAlertSound() {
@@ -435,7 +482,17 @@ function stopAlertSound() {
         clearInterval(alertSoundInterval);
         alertSoundInterval = null;
     }
-    // Also stop any ongoing speech
+    // Stop oscillators
+    alertOscillators.forEach(osc => {
+        try { osc.stop(); } catch (e) {}
+    });
+    alertOscillators = [];
+    // Close audio context
+    if (alertAudioContext) {
+        try { alertAudioContext.close(); } catch (e) {}
+        alertAudioContext = null;
+    }
+    // Stop speech
     if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
     }
