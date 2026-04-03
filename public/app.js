@@ -480,20 +480,7 @@ document.getElementById('alert-form').addEventListener('submit', async (e) => {
             document.getElementById('history-section').classList.add('active');
             loadHistory();
         } else {
-            if (data.requiresHighAccuracy) {
-                showToast(`${data.error} (Actuel: ${data.currentAccuracy}m, Requis: ${data.requiredAccuracy}m)`, 'error');
-                // Retry getting high accuracy location
-                try {
-                    showToast('Obtention d\'une position plus precise...', 'info');
-                    const newLocation = await getHighAccuracyLocation();
-                    currentPosition = newLocation;
-                    showToast(`Nouvelle precision: ${Math.round(newLocation.accuracy)}m`, 'success');
-                } catch (locError) {
-                    showToast(locError.message, 'error');
-                }
-            } else {
-                showToast(data.error || 'Erreur lors de l\'envoi', 'error');
-            }
+            showToast(data.error || 'Erreur lors de l\'envoi', 'error');
         }
     } catch (error) {
         showToast('Erreur de connexion', 'error');
