@@ -412,10 +412,11 @@ document.getElementById('emergency-btn').addEventListener('click', async () => {
         
         currentPosition = location;
         
-        const precisionMsg = location.accuracy > 50 
-            ? `Precision: ${Math.round(location.accuracy)}m (insuffisante)` 
-            : `Position: ${location.lat.toFixed(5)}, ${location.lng.toFixed(5)} (${Math.round(location.accuracy)}m)`;
-        showToast(precisionMsg, location.accuracy > 50 ? 'warning' : 'success');
+        const acc = parseFloat(location.accuracy);
+        const precisionMsg = acc > 50 
+            ? `Precision: ${Math.round(acc)}m (insuffisante)` 
+            : `Position: ${location.lat.toFixed(5)}, ${location.lng.toFixed(5)} (${Math.round(acc)}m)`;
+        showToast(precisionMsg, acc > 50 ? 'warning' : 'success');
         
         document.getElementById('alert-form-container').classList.remove('hidden');
     } catch (error) {
@@ -471,11 +472,12 @@ document.getElementById('alert-form').addEventListener('submit', async (e) => {
         const data = await response.json();
         
         if (response.ok) {
-            const accuracy = currentPosition ? Math.round(currentPosition.accuracy) : 0;
-            if (accuracy > 50) {
-                showToast(`Alerte envoyee avec precision insuffisante: ${accuracy}m`, 'warning');
+            const acc = currentPosition ? parseFloat(currentPosition.accuracy) : 0;
+            const accuracyMeters = Math.round(acc);
+            if (acc > 50) {
+                showToast(`Alerte envoyee avec precision insuffisante: ${accuracyMeters}m`, 'warning');
             } else {
-                showToast(`Alerte envoyee avec succes! Precision: ${accuracy}m`, 'success');
+                showToast(`Alerte envoyee avec succes! Precision: ${accuracyMeters}m`, 'success');
             }
             document.getElementById('alert-form-container').classList.add('hidden');
             document.getElementById('alert-form').reset();
