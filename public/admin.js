@@ -355,7 +355,7 @@ async function editAlert(alertId) {
             
             // Update status
             if (status !== alert.status) {
-                await fetch(`${API_URL}/api/alerts/${alertId}/status`, {
+                const statusResponse = await fetch(`${API_URL}/api/alerts/${alertId}/status`, {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',
@@ -363,11 +363,15 @@ async function editAlert(alertId) {
                     },
                     body: JSON.stringify({ status })
                 });
+                if (!statusResponse.ok) {
+                    const errorData = await statusResponse.json();
+                    throw new Error(errorData.error || 'Erreur mise a jour status');
+                }
             }
             
             // Update assignment
             if (assigned_to !== alert.assigned_to) {
-                await fetch(`${API_URL}/api/alerts/${alertId}/assign`, {
+                const assignResponse = await fetch(`${API_URL}/api/alerts/${alertId}/assign`, {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',
@@ -375,6 +379,10 @@ async function editAlert(alertId) {
                     },
                     body: JSON.stringify({ assigned_to })
                 });
+                if (!assignResponse.ok) {
+                    const errorData = await assignResponse.json();
+                    throw new Error(errorData.error || 'Erreur mise a jour assignment');
+                }
             }
             
             showToast('Alerte mise a jour', 'success');

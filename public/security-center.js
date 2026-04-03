@@ -352,9 +352,10 @@ document.querySelectorAll('.btn-status').forEach(btn => {
                 loadAlerts();
                 loadStats();
                 showAlertDetails(selectedAlert.id);
-                stopAlertSound(); // Stop the alert sound when status is updated
+                stopAlertSound();
             } else {
-                showToast('Erreur de mise a jour', 'error');
+                const data = await response.json();
+                showToast(data.error || 'Erreur de mise a jour', 'error');
             }
         } catch (error) {
             showToast('Erreur de connexion', 'error');
