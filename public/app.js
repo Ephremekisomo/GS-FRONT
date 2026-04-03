@@ -406,15 +406,17 @@ function updateLocationDisplay() {
 // Emergency button
 document.getElementById('emergency-btn').addEventListener('click', async () => {
     try {
-        showToast('Obtention de votre position exacte...', 'info');
+        showToast('Obtention de votre position...', 'info');
         
         const location = await getHighAccuracyLocation();
         
-        if (location.accuracy > 15) {
-            showToast(`Precision insuffisante (${Math.round(location.accuracy)}m). Veuillez vous placer en plein air et reactiver GPS.`, 'warning');
-        }
-        
         currentPosition = location;
+        
+        const precisionMsg = location.accuracy > 50 
+            ? `Precision: ${Math.round(location.accuracy)}m (insuffisante)` 
+            : `Position: ${location.lat.toFixed(5)}, ${location.lng.toFixed(5)} (${Math.round(location.accuracy)}m)`;
+        showToast(precisionMsg, location.accuracy > 50 ? 'warning' : 'success');
+        
         document.getElementById('alert-form-container').classList.remove('hidden');
     } catch (error) {
         showToast(error.message || 'Impossible d\'obtenir votre position', 'error');
