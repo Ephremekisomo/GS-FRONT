@@ -928,6 +928,8 @@ function renderPosts() {
 // =====================
 // EMERGENCY TYPES
 // =====================
+// EMERGENCY TYPES
+// =====================
 
 async function loadEmergencyTypes() {
     try {
@@ -956,9 +958,137 @@ function renderEmergencyTypes() {
             <div class="emergency-type-info">
                 <div class="emergency-type-name">${type.nom}</div>
                 <div class="emergency-type-priority">Priorite: ${type.priorite}</div>
+                <div class="emergency-type-actions">
+                    <button class="btn-icon" onclick="editEmergencyType(${type.id})" title="Modifier">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn-icon danger" onclick="deleteEmergencyType(${type.id})" title="Supprimer">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
             </div>
         </div>
     `).join('');
+}
+
+// Add emergency type button
+document.getElementById('btn-add-emergency-type').addEventListener('click', () => {
+    showEmergencyTypeModal();
+});
+
+function showEmergencyTypeModal(type = null) {
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.id = 'emergency-type-modal';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>${type ? 'Modifier' : 'Ajouter'} un type d'urgence</h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="emergency-type-form">
+                    <div class="form-group">
+                        <label>Nom</label>
+                        <input type="text" name="nom" value="${type?.nom || ''}" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Icone (FontAwesome)</label>
+                        <input type="text" name="icone" value="${type?.icone || ''}" placeholder="fa-exclamation-triangle" required>
+                        <small>Ex: fa-fire, fa-car-crash, fa-heartbeat</small>
+                    </div>
+                    <div class="form-group">
+                        <label>Couleur</label>
+                        <input type="color" name="couleur" value="${type?.couleur || '#e74c3c'}" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Priorite (1-5)</label>
+                        <input type="number" name="priorite" value="${type?.priorite || 3}" min="1" max="5" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <textarea name="description">${type?.description || ''}</textarea>
+                    </div>
+                    <button type="submit" class="btn-primary">${type ? 'Modifier' : 'Ajouter'}</button>
+                </form>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    
+    document.getElementById('emergency-type-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const data = {
+            nom: formData.get('nom'),
+            icone: formData.get('icone'),
+            couleur: formData.get('couleur'),
+            priorite: parseInt(formData.get('priorite')),
+            description: formData.get('description')
+        };
+        
+        try {
+            const token = localStorage.getItem('admin_token');
+            const url = type ? `${API_URL}/api/emergency-types/${type.id}` : `${API_URL}/api/emergency-types`;
+            const method = type ? 'PUT' : 'POST';
+            
+            const response = await fetch(url, {
+                method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(data)
+            });
+            
+            if (response.ok) {
+                showToast('Type d\'urgence ' + (type ? 'modifie' : 'ajoute'), 'success');
+                closeModal();
+                await loadEmergencyTypes();
+                renderEmergencyTypes();
+            } else {
+                const error = await response.json();
+                showToast(error.error || 'Erreur', 'error');
+            }
+        } catch (err) {
+            showToast('Erreur de connexion', 'error');
+        }
+    });
+}
+
+function editEmergencyType(id) {
+    const type = window.emergencyTypes.find(t => t.id === id);
+    if (type) {
+        showEmergencyTypeModal(type);
+    }
+}
+
+async function deleteEmergencyType(id) {
+    if (!confirm('Voulez-vous vraiment supprimer ce type d\'urgence?')) return;
+    
+    try {
+        const token = localStorage.getItem('admin_token');
+        const response = await fetch(`${API_URL}/api/emergency-types/${id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (response.ok) {
+            showToast('Type d\'urgence supprime', 'success');
+            await loadEmergencyTypes();
+            renderEmergencyTypes();
+        } else {
+            const error = await response.json();
+            showToast(error.error || 'Erreur', 'error');
+        }
+    } catch (err) {
+        showToast('Erreur de connexion', 'error');
+    }
+}
+
+function closeModal() {
+    const modal = document.getElementById('emergency-type-modal');
+    if (modal) modal.remove();
 }
 
 // =====================
