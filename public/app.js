@@ -469,15 +469,12 @@ document.getElementById('alert-form').addEventListener('submit', async (e) => {
         const data = await response.json();
         
         if (response.ok) {
-            showToast('Alerte envoyee avec succes!', 'success');
+            const accuracy = currentPosition ? Math.round(currentPosition.accuracy) : 0;
+            showToast(`Alerte envoyee avec succes! Precision: ${accuracy}m`, 'success');
             document.getElementById('alert-form-container').classList.add('hidden');
             document.getElementById('alert-form').reset();
             selectedEmergencyType = null;
             document.querySelectorAll('.emergency-type-btn').forEach(b => b.classList.remove('selected'));
-            showToast('Alerte envoyee avec succes!', 'success');
-            document.getElementById('alert-form-container').classList.add('hidden');
-            document.getElementById('alert-form').reset();
-            selectedEmergencyType = null;
             // Show history after sending alert
             document.getElementById('dashboard-section').classList.remove('active');
             document.getElementById('history-section').classList.add('active');
