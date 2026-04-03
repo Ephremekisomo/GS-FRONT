@@ -352,6 +352,46 @@ function getUserLocation() {
     }
 }
 
+function getHighAccuracyLocation() {
+    return new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+            reject(new Error('Geolocation non supportee'));
+            return;
+        }
+        
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const location = {
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude,
+                    accuracy: position.coords.accuracy
+                };
+                resolve(location);
+            },
+            (error) => {
+                let errorMessage = 'Impossible d\'obtenir votre position';
+                switch(error.code) {
+                    case error.PERMISSION_DENIED:
+                        errorMessage = 'Veuillez autoriser l\'acces a votre position';
+                        break;
+                    case error.POSITION_UNAVAILABLE:
+                        errorMessage = 'Position non disponible';
+                        break;
+                    case error.TIMEOUT:
+                        errorMessage = 'Delai d\'attente depasse';
+                        break;
+                }
+                reject(new Error(errorMessage));
+            },
+            { 
+                enableHighAccuracy: true, 
+                timeout: 30000,
+                maximumAge: 0
+            }
+        );
+    });
+}
+
 function updateLocationDisplay() {
     if (currentPosition) {
         document.querySelector('#alert-location .lat').textContent = `Lat: ${currentPosition.lat.toFixed(6)}`;
@@ -364,11 +404,21 @@ function updateLocationDisplay() {
 // =====================
 
 // Emergency button
-document.getElementById('emergency-btn').addEventListener('click', () => {
-    if (!currentPosition) {
-        getUserLocation();
+document.getElementById('emergency-btn').addEventListener('click', async () => {
+    try {
+        showToast('Obtention de votre position exacte...', 'info');
+        
+        const location = await getHighAccuracyLocation();
+        
+        if (location.accuracy > 15) {
+            showToast(`Precision insuffisante (${Math.round(location.accuracy)}m). Veuillez vous placer en plein air et reactiver GPS.`, 'warning');
+        }
+        
+        currentPosition = location;
+        document.getElementById('alert-form-container').classList.remove('hidden');
+    } catch (error) {
+        showToast(error.message || 'Impossible d\'obtenir votre position', 'error');
     }
-    document.getElementById('alert-form-container').classList.remove('hidden');
 });
 
 // Close alert form
@@ -389,16 +439,19 @@ document.getElementById('alert-form').addEventListener('submit', async (e) => {
         return;
     }
     
+    if (!currentPosition) {
+        showToast('Position non disponible. Veuillez reessayer.', 'warning');
+        return;
+    }
+    
     const formData = new FormData();
     formData.append('type_id', selectedEmergencyType.id);
     formData.append('description', document.getElementById('alert-description').value);
     formData.append('priority', selectedEmergencyType.priority);
     
-    if (currentPosition) {
-        formData.append('latitude', currentPosition.lat);
-        formData.append('longitude', currentPosition.lng);
-        formData.append('accuracy', currentPosition.accuracy);
-    }
+    formData.append('latitude', currentPosition.lat);
+    formData.append('longitude', currentPosition.lng);
+    formData.append('accuracy', currentPosition.accuracy);
     
     const photoFile = document.getElementById('alert-photo').files[0];
     if (photoFile) {
@@ -430,7 +483,20 @@ document.getElementById('alert-form').addEventListener('submit', async (e) => {
             document.getElementById('history-section').classList.add('active');
             loadHistory();
         } else {
-            showToast(data.error || 'Erreur lors de l\'envoi', 'error');
+            if (data.requiresHighAccuracy) {
+                showToast(`${data.error} (Actuel: ${data.currentAccuracy}m, Requis: ${data.requiredAccuracy}m)`, 'error');
+                // Retry getting high accuracy location
+                try {
+                    showToast('Obtention d\'une position plus precise...', 'info');
+                    const newLocation = await getHighAccuracyLocation();
+                    currentPosition = newLocation;
+                    showToast(`Nouvelle precision: ${Math.round(newLocation.accuracy)}m`, 'success');
+                } catch (locError) {
+                    showToast(locError.message, 'error');
+                }
+            } else {
+                showToast(data.error || 'Erreur lors de l\'envoi', 'error');
+            }
         }
     } catch (error) {
         showToast('Erreur de connexion', 'error');
