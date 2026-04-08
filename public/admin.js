@@ -1386,18 +1386,6 @@ async function createUser() {
         showToast('Erreur de connexion', 'error');
     }
 }
-        
-        if (response.ok) {
-            showToast('Mot de passe change', 'success');
-            document.getElementById('change-password-form').reset();
-        } else {
-            const data = await response.json();
-            showToast(data.error || 'Erreur de changement', 'error');
-        }
-    } catch (error) {
-        showToast('Erreur de connexion', 'error');
-    }
-});
 
 // =====================
 // SOCKET.IO
