@@ -987,7 +987,7 @@ function showEmergencyTypeModal(type = null) {
                 <button class="modal-close" onclick="closeModal()">&times;</button>
             </div>
             <div class="modal-body">
-                <form id="emergency-type-form">
+                <form id="emergency-type-form" enctype="multipart/form-data">
                     <div class="form-group">
                         <label>Nom</label>
                         <input type="text" name="nom" value="${type?.nom || ''}" required>
@@ -1009,6 +1009,12 @@ function showEmergencyTypeModal(type = null) {
                         <label>Description</label>
                         <textarea name="description">${type?.description || ''}</textarea>
                     </div>
+                    <div class="form-group">
+                        <label>Photo</label>
+                        <input type="file" name="photo" accept="image/*">
+                        ${type?.photo ? `<p class="current-photo">Photo actuelle: <img src="${API_URL}${type.photo}" style="width: 50px; height: 50px; object-fit: cover;"></p>` : ''}
+                        <input type="hidden" name="existing_photo" value="${type?.photo || ''}">
+                    </div>
                     <button type="submit" class="btn-primary">${type ? 'Modifier' : 'Ajouter'}</button>
                 </form>
             </div>
@@ -1019,13 +1025,6 @@ function showEmergencyTypeModal(type = null) {
     document.getElementById('emergency-type-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const formData = new FormData(e.target);
-        const data = {
-            nom: formData.get('nom'),
-            icone: formData.get('icone'),
-            couleur: formData.get('couleur'),
-            priorite: parseInt(formData.get('priorite')),
-            description: formData.get('description')
-        };
         
         try {
             const token = localStorage.getItem('admin_token');
@@ -1035,10 +1034,9 @@ function showEmergencyTypeModal(type = null) {
             const response = await fetch(url, {
                 method,
                 headers: {
-                    'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify(data)
+                body: formData
             });
             
             if (response.ok) {
