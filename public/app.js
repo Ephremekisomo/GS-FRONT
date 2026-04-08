@@ -21,10 +21,64 @@ let currentUser = null;
 let map = null;
 let userMarker = null;
 let currentPosition = null;
+let currentQuartier = null;
+let currentAvenue = null;
 let emergencyTypes = [];
 let selectedEmergencyType = null;
 let tempToken = null;
 let socket = null;
+
+// Goma neighborhoods with approximate centers
+const GOMA_QUARTIERS = [
+    { name: "Les Volcans", lat: -1.680, lng: 29.230 },
+    { name: "Ndosho", lat: -1.700, lng: 29.240 },
+    { name: "Majengo", lat: -1.690, lng: 29.220 },
+    { name: "Virunga", lat: -1.670, lng: 29.250 },
+    { name: "Murara", lat: -1.660, lng: 29.260 },
+    { name: "Lac vert", lat: -1.710, lng: 29.230 },
+    { name: "Katindo", lat: -1.690, lng: 29.250 },
+    { name: "Himbi", lat: -1.680, lng: 29.240 },
+    { name: "Mabanga nord", lat: -1.670, lng: 29.220 },
+    { name: "Mabanga sud", lat: -1.680, lng: 29.210 },
+    { name: "Mapendo", lat: -1.700, lng: 29.260 },
+    { name: "Mikeno", lat: -1.660, lng: 29.230 },
+    { name: "Mugunga", lat: -1.720, lng: 29.250 },
+    { name: "Nyiragongo", lat: -1.650, lng: 29.270 },
+    { name: "Goma ville", lat: -1.690, lng: 29.230 },
+    { name: "Kyeshero", lat: -1.640, lng: 29.280 },
+    { name: "Bujovu", lat: -1.730, lng: 29.220 }
+];
+
+function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
+    const R = 6371; // Radius of earth in km
+    const dLat = deg2rad(lat2 - lat1);
+    const dLon = deg2rad(lon2 - lon1);
+    const a = 
+        Math.sin(dLat/2) * Math.sin(dLat/2) +
+        Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * 
+        Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+}
+
+function deg2rad(deg) {
+    return deg * (Math.PI/180);
+}
+
+function getQuartierFromCoords(lat, lng) {
+    let closestQuartier = null;
+    let minDistance = Infinity;
+    
+    for (const quartier of GOMA_QUARTIERS) {
+        const distance = getDistanceFromLatLonInKm(lat, lng, quartier.lat, quartier.lng);
+        if (distance < minDistance) {
+            minDistance = distance;
+            closestQuartier = quartier.name;
+        }
+    }
+    
+    return closestQuartier;
+}
 
 // =====================
 // AUTHENTICATION
@@ -396,6 +450,19 @@ function updateLocationDisplay() {
     if (currentPosition) {
         document.querySelector('#alert-location .lat').textContent = `Lat: ${currentPosition.lat.toFixed(6)}`;
         document.querySelector('#alert-location .lng').textContent = `Lng: ${currentPosition.lng.toFixed(6)}`;
+        
+        const quartierEl = document.querySelector('#alert-location .quartier');
+        const accuracyEl = document.querySelector('#alert-location .accuracy');
+        
+        if (quartierEl) {
+            quartierEl.innerHTML = `<i class="fas fa-map-pin"></i> <strong>Quartier:</strong> ${currentQuartier || 'Non detecte'}`;
+        }
+        if (accuracyEl) {
+            const acc = currentPosition.accuracy ? Math.round(currentPosition.accuracy) : 0;
+            const quality = acc <= 10 ? 'haute' : acc <= 30 ? 'moyenne' : 'basse';
+            const color = acc <= 10 ? '#27ae60' : acc <= 30 ? '#f39c12' : '#e74c3c';
+            accuracyEl.innerHTML = `<i class="fas fa-crosshairs"></i> <strong>Precision:</strong> <span style="color:${color}">${acc}m (${quality})</span>`;
+        }
     }
 }
 
@@ -405,22 +472,30 @@ function updateLocationDisplay() {
 
 // Emergency button
 document.getElementById('emergency-btn').addEventListener('click', async () => {
+    const emergencyBtn = document.getElementById('emergency-btn');
+    emergencyBtn.disabled = true;
+    emergencyBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>Localisation...</span>';
+    
     try {
-        showToast('Obtention de votre position...', 'info');
-        
         const location = await getHighAccuracyLocation();
         
         currentPosition = location;
         
+        currentQuartier = getQuartierFromCoords(location.lat, location.lng);
+        
         const acc = parseFloat(location.accuracy);
-        const precisionMsg = acc > 50 
-            ? `Precision: ${Math.round(acc)}m (insuffisante)` 
-            : `Position: ${location.lat.toFixed(5)}, ${location.lng.toFixed(5)} (${Math.round(acc)}m)`;
-        showToast(precisionMsg, acc > 50 ? 'warning' : 'success');
+        const quality = acc <= 10 ? 'haute' : acc <= 30 ? 'moyenne' : 'basse';
+        
+        showToast(`${currentQuartier || 'Position detectee'} - Precision: ${Math.round(acc)}m (${quality})`, acc > 30 ? 'warning' : 'success');
+        
+        updateLocationDisplay();
         
         document.getElementById('alert-form-container').classList.remove('hidden');
     } catch (error) {
         showToast(error.message || 'Impossible d\'obtenir votre position', 'error');
+    } finally {
+        emergencyBtn.disabled = false;
+        emergencyBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i><span>ALERTE D\'URGENCE</span>';
     }
 });
 
@@ -455,6 +530,8 @@ document.getElementById('alert-form').addEventListener('submit', async (e) => {
     formData.append('latitude', currentPosition.lat);
     formData.append('longitude', currentPosition.lng);
     formData.append('accuracy', currentPosition.accuracy);
+    formData.append('quartier', currentQuartier || '');
+    formData.append('avenue', document.getElementById('alert-avenue').value || '');
     
     const photoFile = document.getElementById('alert-photo').files[0];
     if (photoFile) {

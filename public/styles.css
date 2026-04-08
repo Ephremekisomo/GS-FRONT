@@ -503,12 +503,59 @@ section.active {
 }
 
 .location-display {
-    display: flex;
-    gap: 20px;
     padding: 10px;
     background: #f8f9fa;
     border-radius: 8px;
+}
+
+.location-info {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.location-coords {
+    display: flex;
+    gap: 15px;
     font-family: monospace;
+    font-size: 13px;
+    color: #2c3e50;
+}
+
+.location-address {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    font-size: 14px;
+    color: #555;
+}
+
+.location-address i {
+    width: 20px;
+    color: #3498db;
+    margin-right: 5px;
+}
+
+.location-address .quartier {
+    font-weight: 600;
+    color: #27ae60;
+}
+
+.location-address .accuracy {
+    font-size: 12px;
+}
+
+.avenue-input {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.avenue-input input {
+    flex: 1;
+    padding: 6px 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
     font-size: 13px;
 }
 
