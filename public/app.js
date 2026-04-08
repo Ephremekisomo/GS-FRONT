@@ -430,10 +430,9 @@ function getHighAccuracyLocation() {
             return;
         }
         
-        // Use watchPosition for faster initial result on mobile
-        const watchId = navigator.geolocation.watchPosition(
+        // Try with longer timeout and cache first
+        navigator.geolocation.getCurrentPosition(
             (position) => {
-                navigator.geolocation.clearWatch(watchId);
                 const location = {
                     lat: position.coords.latitude,
                     lng: position.coords.longitude,
@@ -442,25 +441,28 @@ function getHighAccuracyLocation() {
                 resolve(location);
             },
             (error) => {
-                navigator.geolocation.clearWatch(watchId);
+                console.log('Geolocation error:', error.code, error.message);
                 let errorMessage = 'Impossible d\'obtenir votre position';
                 switch(error.code) {
                     case error.PERMISSION_DENIED:
                         errorMessage = 'Veuillez autoriser l\'acces a votre position';
                         break;
                     case error.POSITION_UNAVAILABLE:
-                        errorMessage = 'Position non disponible';
+                        errorMessage = 'Position non disponible - Activez le GPS';
                         break;
                     case error.TIMEOUT:
-                        errorMessage = 'Delai d\'attente depasse';
+                        errorMessage = 'Delai d\'attente depasse - Verifiez votre connexion GPS';
+                        break;
+                    default:
+                        errorMessage = 'Erreur GPS: ' + error.message;
                         break;
                 }
                 reject(new Error(errorMessage));
             },
             { 
                 enableHighAccuracy: true, 
-                timeout: 15000,
-                maximumAge: 30000
+                timeout: 30000,
+                maximumAge: 120000
             }
         );
     });
