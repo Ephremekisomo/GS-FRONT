@@ -1253,26 +1253,139 @@ document.getElementById('admin-profile-form').addEventListener('submit', async (
 
 document.getElementById('change-password-form').addEventListener('submit', async (e) => {
     e.preventDefault();
-    
     const currentPassword = document.getElementById('current-password').value;
     const newPassword = document.getElementById('new-password').value;
     const confirmPassword = document.getElementById('confirm-password').value;
-    
+
     if (newPassword !== confirmPassword) {
         showToast('Les mots de passe ne correspondent pas', 'error');
         return;
     }
-    
+
     try {
         const token = localStorage.getItem('admin_token');
-        const response = await fetch(`${API_URL}/api/auth/change-password`, {
-            method: 'POST',
+        const response = await fetch(`${API_URL}/api/user/change-password`, {
+            method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({ currentPassword, newPassword })
         });
+
+        const data = await response.json();
+        if (response.ok) {
+            showToast('Mot de passe change avec succes', 'success');
+            document.getElementById('change-password-form').reset();
+        } else {
+            showToast(data.error || 'Erreur', 'error');
+        }
+    } catch (error) {
+        showToast('Erreur de connexion', 'error');
+    }
+});
+
+// Add user button
+document.getElementById('btn-add-user').addEventListener('click', () => {
+    showAddUserModal();
+});
+
+function showAddUserModal() {
+    const modal = document.getElementById('modal');
+    const modalTitle = document.getElementById('modal-title');
+    const modalBody = document.getElementById('modal-body');
+
+    modalTitle.textContent = 'Ajouter un utilisateur';
+    modalBody.innerHTML = `
+        <form id="add-user-form" class="form">
+            <div class="form-group">
+                <label for="new-user-nom">Nom *</label>
+                <input type="text" id="new-user-nom" required>
+            </div>
+            <div class="form-group">
+                <label for="new-user-prenom">Prenom *</label>
+                <input type="text" id="new-user-prenom" required>
+            </div>
+            <div class="form-group">
+                <label for="new-user-telephone">Telephone *</label>
+                <input type="tel" id="new-user-telephone" required placeholder="+243...">
+            </div>
+            <div class="form-group">
+                <label for="new-user-email">Email</label>
+                <input type="email" id="new-user-email">
+            </div>
+            <div class="form-group">
+                <label for="new-user-password">Mot de passe *</label>
+                <input type="password" id="new-user-password" required>
+            </div>
+            <div class="form-group">
+                <label for="new-user-role">Role</label>
+                <select id="new-user-role">
+                    <option value="citoyen">Citoyen</option>
+                    <option value="admin">Admin</option>
+                    <option value="police">Police</option>
+                    <option value="pompiers">Pompiers</option>
+                    <option value="ambulance">Ambulance</option>
+                    <option value="protection civile">Protection Civile</option>
+                    <option value="centre_securite">Centre de securite</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="new-user-quartier">Quartier</label>
+                <input type="text" id="new-user-quartier">
+            </div>
+            <div class="form-group">
+                <label for="new-user-avenue">Avenue</label>
+                <input type="text" id="new-user-avenue">
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn-primary">Creer l'utilisateur</button>
+                <button type="button" class="btn-secondary" onclick="document.getElementById('modal').classList.add('hidden')">Annuler</button>
+            </div>
+        </form>
+    `;
+
+    document.getElementById('add-user-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        await createUser();
+    });
+
+    modal.classList.remove('hidden');
+}
+
+async function createUser() {
+    const nom = document.getElementById('new-user-nom').value;
+    const prenom = document.getElementById('new-user-prenom').value;
+    const telephone = document.getElementById('new-user-telephone').value;
+    const email = document.getElementById('new-user-email').value;
+    const password = document.getElementById('new-user-password').value;
+    const role = document.getElementById('new-user-role').value;
+    const quartier = document.getElementById('new-user-quartier').value;
+    const avenue = document.getElementById('new-user-avenue').value;
+
+    try {
+        const token = localStorage.getItem('admin_token');
+        const response = await fetch(`${API_URL}/api/users`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ nom, prenom, telephone, email, password, role, quartier, avenue })
+        });
+
+        const data = await response.json();
+        if (response.ok) {
+            showToast('Utilisateur cree avec succes', 'success');
+            document.getElementById('modal').classList.add('hidden');
+            loadUsers();
+        } else {
+            showToast(data.error || 'Erreur lors de la creation', 'error');
+        }
+    } catch (error) {
+        showToast('Erreur de connexion', 'error');
+    }
+}
         
         if (response.ok) {
             showToast('Mot de passe change', 'success');
