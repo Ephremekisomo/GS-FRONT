@@ -128,6 +128,8 @@ async function loadAlerts() {
         }
         
         alerts = await response.json();
+        // Sort alerts by date - newest first
+        alerts.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
         renderAlerts();
         updateMapMarkers();
     } catch (error) {
@@ -543,7 +545,11 @@ function initSocket() {
         console.log('New alert received:', alert);
         startAlertSound();
         showToast(`Nouvelle alerte: ${alert.type_nom}`, 'warning');
-        loadAlerts();
+        
+        // Add new alert at the beginning of the array
+        alerts.unshift(alert);
+        renderAlerts();
+        updateMapMarkers();
         loadStats();
     });
     
