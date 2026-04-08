@@ -430,8 +430,10 @@ function getHighAccuracyLocation() {
             return;
         }
         
-        navigator.geolocation.getCurrentPosition(
+        // Use watchPosition for faster initial result on mobile
+        const watchId = navigator.geolocation.watchPosition(
             (position) => {
+                navigator.geolocation.clearWatch(watchId);
                 const location = {
                     lat: position.coords.latitude,
                     lng: position.coords.longitude,
@@ -440,6 +442,7 @@ function getHighAccuracyLocation() {
                 resolve(location);
             },
             (error) => {
+                navigator.geolocation.clearWatch(watchId);
                 let errorMessage = 'Impossible d\'obtenir votre position';
                 switch(error.code) {
                     case error.PERMISSION_DENIED:
@@ -456,8 +459,8 @@ function getHighAccuracyLocation() {
             },
             { 
                 enableHighAccuracy: true, 
-                timeout: 5000,
-                maximumAge: 0
+                timeout: 15000,
+                maximumAge: 30000
             }
         );
     });
