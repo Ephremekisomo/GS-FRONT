@@ -439,7 +439,7 @@ function getHighAccuracyLocation() {
             },
             { 
                 enableHighAccuracy: true, 
-                timeout: 30000,
+                timeout: 5000,
                 maximumAge: 0
             }
         );
@@ -448,11 +448,13 @@ function getHighAccuracyLocation() {
 
 function updateLocationDisplay() {
     if (currentPosition) {
-        document.querySelector('#alert-location .lat').textContent = `Lat: ${currentPosition.lat.toFixed(6)}`;
-        document.querySelector('#alert-location .lng').textContent = `Lng: ${currentPosition.lng.toFixed(6)}`;
+        const latEl = document.getElementById('alert-location').querySelector('.lat');
+        const lngEl = document.getElementById('alert-location').querySelector('.lng');
+        const quartierEl = document.getElementById('alert-location').querySelector('.quartier');
+        const accuracyEl = document.getElementById('alert-location').querySelector('.accuracy');
         
-        const quartierEl = document.querySelector('#alert-location .quartier');
-        const accuracyEl = document.querySelector('#alert-location .accuracy');
+        if (latEl) latEl.textContent = `Lat: ${currentPosition.lat.toFixed(6)}`;
+        if (lngEl) lngEl.textContent = `Lng: ${currentPosition.lng.toFixed(6)}`;
         
         if (quartierEl) {
             quartierEl.innerHTML = `<i class="fas fa-map-pin"></i> <strong>Quartier:</strong> ${currentQuartier || 'Non detecte'}`;
