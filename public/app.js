@@ -44,13 +44,13 @@ const GOMA_QUARTIERS = [
     { name: "Mikeno", lat: -1.660, lng: 29.230 },
     { name: "Mugunga", lat: -1.720, lng: 29.250 },
     { name: "Nyiragongo", lat: -1.650, lng: 29.270 },
-    { name: "Goma ville", lat: -1.690, lng: 29.230 },
+    { name: "Goma ville", lat: -1.689, lng: 29.230 },
     { name: "Kyeshero", lat: -1.640, lng: 29.280 },
     { name: "Bujovu", lat: -1.730, lng: 29.220 }
 ];
 
 function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
-    const R = 6371; // Radius of earth in km
+    const R = 6371;
     const dLat = deg2rad(lat2 - lat1);
     const dLon = deg2rad(lon2 - lon1);
     const a = 
@@ -63,6 +63,23 @@ function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
 
 function deg2rad(deg) {
     return deg * (Math.PI/180);
+}
+
+async function getAddressFromCoords(lat, lng) {
+    try {
+        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&limit=1`);
+        const data = await response.json();
+        
+        if (data && data.address) {
+            const address = data.address;
+            const quartier = address.suburb || address.neighbourhood || address.quarter || address.village || address.municipality || null;
+            const avenue = address.road || address.street || address.street_name || null;
+            return { quartier, avenue };
+        }
+    } catch (error) {
+        console.log('Reverse geocoding failed:', error);
+    }
+    return { quartier: null, avenue: null };
 }
 
 function getQuartierFromCoords(lat, lng) {
@@ -487,14 +504,17 @@ document.getElementById('emergency-btn').addEventListener('click', async () => {
         
         currentPosition = location;
         
-        // Use the user's registered quartier and avenue from their profile
-        currentQuartier = currentUser?.quartier || getQuartierFromCoords(location.lat, location.lng);
-        currentAvenue = currentUser?.avenue || '';
+        // Get real address from coordinates using reverse geocoding
+        const addressData = await getAddressFromCoords(location.lat, location.lng);
+        
+        // Use real address from geocoding, fallback to algorithmic detection
+        currentQuartier = addressData.quartier || getQuartierFromCoords(location.lat, location.lng);
+        currentAvenue = addressData.avenue || 'Non specifiee';
         
         const acc = parseFloat(location.accuracy);
         const quality = acc <= 10 ? 'haute' : acc <= 30 ? 'moyenne' : 'basse';
         
-        showToast(`${currentQuartier || 'Position detectee'} - Precision: ${Math.round(acc)}m (${quality})`, acc > 30 ? 'warning' : 'success');
+        showToast(`${currentQuartier} - ${currentAvenue} (${Math.round(acc)}m)`, acc > 30 ? 'warning' : 'success');
         
         updateLocationDisplay();
         
