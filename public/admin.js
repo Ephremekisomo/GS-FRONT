@@ -71,6 +71,11 @@ document.querySelectorAll('.nav-item').forEach(item => {
         document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
         document.getElementById(`section-${section}`).classList.add('active');
         
+        // Close mobile sidebar
+        document.querySelector('.sidebar').classList.remove('active');
+        const overlay = document.querySelector('.sidebar-overlay');
+        if (overlay) overlay.style.display = 'none';
+        
         // Update page title
         const titles = {
             'dashboard': 'Tableau de bord',
@@ -93,6 +98,34 @@ document.querySelectorAll('.nav-item').forEach(item => {
 document.getElementById('btn-toggle-sidebar').addEventListener('click', () => {
     document.querySelector('.sidebar').classList.toggle('collapsed');
 });
+
+// Mobile menu toggle
+const mobileMenuBtn = document.getElementById('btn-mobile-menu');
+if (mobileMenuBtn) {
+    mobileMenuBtn.addEventListener('click', () => {
+        document.querySelector('.sidebar').classList.toggle('active');
+        
+        // Create overlay if it doesn't exist
+        let overlay = document.querySelector('.sidebar-overlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.className = 'sidebar-overlay';
+            document.body.appendChild(overlay);
+            
+            overlay.addEventListener('click', () => {
+                document.querySelector('.sidebar').classList.remove('active');
+                overlay.style.display = 'none';
+            });
+        }
+        
+        const sidebar = document.querySelector('.sidebar');
+        if (sidebar.classList.contains('active')) {
+            overlay.style.display = 'block';
+        } else {
+            overlay.style.display = 'none';
+        }
+    });
+}
 
 // Refresh button
 document.getElementById('btn-refresh').addEventListener('click', () => {
