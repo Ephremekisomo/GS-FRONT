@@ -451,6 +451,7 @@ function updateLocationDisplay() {
         const latEl = document.getElementById('alert-location').querySelector('.lat');
         const lngEl = document.getElementById('alert-location').querySelector('.lng');
         const quartierEl = document.getElementById('alert-location').querySelector('.quartier');
+        const avenueEl = document.getElementById('alert-location').querySelector('.avenue-display');
         const accuracyEl = document.getElementById('alert-location').querySelector('.accuracy');
         
         if (latEl) latEl.textContent = `Lat: ${currentPosition.lat.toFixed(6)}`;
@@ -458,6 +459,9 @@ function updateLocationDisplay() {
         
         if (quartierEl) {
             quartierEl.innerHTML = `<i class="fas fa-map-pin"></i> <strong>Quartier:</strong> ${currentQuartier || 'Non detecte'}`;
+        }
+        if (avenueEl) {
+            avenueEl.innerHTML = `<i class="fas fa-road"></i> <strong>Avenue:</strong> ${currentAvenue || 'Non specifiee'}`;
         }
         if (accuracyEl) {
             const acc = currentPosition.accuracy ? Math.round(currentPosition.accuracy) : 0;
@@ -483,7 +487,9 @@ document.getElementById('emergency-btn').addEventListener('click', async () => {
         
         currentPosition = location;
         
-        currentQuartier = getQuartierFromCoords(location.lat, location.lng);
+        // Use the user's registered quartier and avenue from their profile
+        currentQuartier = currentUser?.quartier || getQuartierFromCoords(location.lat, location.lng);
+        currentAvenue = currentUser?.avenue || '';
         
         const acc = parseFloat(location.accuracy);
         const quality = acc <= 10 ? 'haute' : acc <= 30 ? 'moyenne' : 'basse';
@@ -533,7 +539,7 @@ document.getElementById('alert-form').addEventListener('submit', async (e) => {
     formData.append('longitude', currentPosition.lng);
     formData.append('accuracy', currentPosition.accuracy);
     formData.append('quartier', currentQuartier || '');
-    formData.append('avenue', document.getElementById('alert-avenue').value || '');
+    formData.append('avenue', currentAvenue || '');
     
     const photoFile = document.getElementById('alert-photo').files[0];
     if (photoFile) {
@@ -643,6 +649,11 @@ async function loadUserProfile() {
         });
         
         const user = await response.json();
+        
+        if (currentUser) {
+            currentUser.quartier = user.quartier;
+            currentUser.avenue = user.avenue;
+        }
         
         document.getElementById('profile-nom').value = user.nom || '';
         document.getElementById('profile-prenom').value = user.prenom || '';
