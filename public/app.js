@@ -27,6 +27,7 @@ let emergencyTypes = [];
 let selectedEmergencyType = null;
 let tempToken = null;
 let socket = null;
+let activeCall = null;
 
 // Goma neighborhoods with approximate centers
 const GOMA_QUARTIERS = [
