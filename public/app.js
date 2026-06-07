@@ -27,7 +27,6 @@ let emergencyTypes = [];
 let selectedEmergencyType = null;
 let tempToken = null;
 let socket = null;
-let activeCall = null;
 
 // Goma neighborhoods with approximate centers
 const GOMA_QUARTIERS = [
@@ -1277,7 +1276,6 @@ let isVideoCall = false;
 let isMuted = false;
 let isVideoOff = false;
 let currentCallData = null;
-let activeCall = null;
 
 // ICE servers configuration (using public STUN servers)
 const ICE_SERVERS = {
