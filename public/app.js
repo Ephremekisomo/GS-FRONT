@@ -6,8 +6,8 @@
 // CONFIGURATION
 // =====================
 
-const API_URL = 'https://gomasecures-backend.onrender.com';
-const SOCKET_URL = 'https://gomasecures-backend.onrender.com';
+const API_URL = 'https://goma-security-backend.onrender.com';
+const SOCKET_URL = 'https://goma-security-backend.onrender.com';
 
 // Goma default coordinates
 const DEFAULT_LAT = -1.6879163817734162;
@@ -106,8 +106,12 @@ function getQuartierFromCoords(lat, lng) {
 function checkAuth() {
     const token = localStorage.getItem('token');
     if (token) {
-        // Decode token to get user role
+        // Decode token to get user info
         const userRole = getUserRoleFromToken(token);
+        const userId = getCurrentUserId();
+        
+        // Build currentUser object from token
+        currentUser = { id: userId, role: userRole };
         
         // Role-based redirection for existing sessions
         if (userRole === 'admin') {
@@ -323,7 +327,8 @@ async function initApp() {
     initMap();
     initSocket();
     getUserLocation();
-    loadUserProfile();
+    await loadUserProfile();
+    initCallSocket();
 }
 
 // Load emergency types
@@ -1213,7 +1218,6 @@ function initSocket() {
     });
     
     initChatSocket();
-    initCallSocket();
 }
 
 // =====================
@@ -1563,10 +1567,13 @@ function endCall() {
     document.getElementById('remote-video').srcObject = null;
 }
 
-// Socket listeners for calls
+// Socket listeners for calls (only for non-citizen users)
 function initCallSocket() {
     if (!socket) return;
-
+    
+    // Only initialize for admin/security center/poste users
+    if (!currentUser || currentUser.role === 'citoyen') return;
+    
     socket.on('admin-incoming-call', (data) => {
         handleIncomingCall(data);
         

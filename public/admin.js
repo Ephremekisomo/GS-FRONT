@@ -6,8 +6,8 @@
 // CONFIGURATION
 // =====================
 
-const API_URL = 'https://gomasecures-backend.onrender.com';
-const SOCKET_URL = 'https://gomasecures-backend.onrender.com';
+const API_URL = 'https://goma-security-backend.onrender.com';
+const SOCKET_URL = 'https://goma-security-backend.onrender.com';
 
 // =====================
 // STATE
