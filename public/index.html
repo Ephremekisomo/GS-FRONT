@@ -176,6 +176,9 @@
                         <span>Goma Security</span>
                     </div>
                     <div class="user-menu">
+                        <button id="btn-call" class="icon-btn" title="Appeler le Centre de Securite">
+                            <i class="fas fa-phone"></i>
+                        </button>
                         <button id="btn-chat" class="icon-btn" title="Chat">
                             <i class="fas fa-comments"></i>
                         </button>
@@ -372,6 +375,82 @@
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Call Modal - Choose call type -->
+        <div id="call-modal" class="modal hidden">
+            <div class="modal-content call-modal-content">
+                <div class="modal-header">
+                    <h3>Appel au Centre de Securite</h3>
+                    <button class="close-modal" data-modal="call-modal">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body call-modal-body">
+                    <p class="call-modal-text">Choisissez le type d'appel</p>
+                    <div class="call-options">
+                        <button id="btn-audio-call" class="call-option-btn">
+                            <i class="fas fa-phone-alt"></i>
+                            <span>Appel Vocal</span>
+                        </button>
+                        <button id="btn-video-call" class="call-option-btn video">
+                            <i class="fas fa-video"></i>
+                            <span>Appel Video</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Incoming Call Modal -->
+        <div id="incoming-call-modal" class="modal hidden">
+            <div class="modal-content incoming-call-content">
+                <div class="incoming-call-animation">
+                    <i class="fas fa-phone-volume"></i>
+                </div>
+                <h3 id="incoming-call-title">Appel entrant</h3>
+                <p id="incoming-call-type" class="incoming-call-type">Appel vocal de <span id="incoming-call-user"></span></p>
+                <div class="incoming-call-location" id="incoming-call-location-container">
+                    <i class="fas fa-map-marker-alt"></i>
+                    <span id="incoming-call-location">Position detectee...</span>
+                </div>
+                <div class="incoming-call-actions">
+                    <button id="btn-reject-call" class="call-action-btn reject">
+                        <i class="fas fa-phone-slash"></i>
+                    </button>
+                    <button id="btn-answer-call" class="call-action-btn answer">
+                        <i class="fas fa-phone"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Active Call Modal -->
+        <div id="active-call-modal" class="modal hidden">
+            <div class="modal-content active-call-content">
+                <div class="call-header-info">
+                    <h3 id="call-status">Connexion en cours...</h3>
+                    <div id="call-location-info" class="call-location-info">
+                        <i class="fas fa-map-marker-alt"></i>
+                        <span id="call-location-text"></span>
+                    </div>
+                </div>
+                <div class="video-container" id="video-container">
+                    <video id="remote-video" autoplay playsinline></video>
+                    <video id="local-video" autoplay playsinline muted></video>
+                </div>
+                <div class="call-controls">
+                    <button id="btn-mute" class="call-control-btn">
+                        <i class="fas fa-microphone"></i>
+                    </button>
+                    <button id="btn-video-off" class="call-control-btn" style="display: none;">
+                        <i class="fas fa-video-slash"></i>
+                    </button>
+                    <button id="btn-end-call" class="call-control-btn end">
+                        <i class="fas fa-phone-slash"></i>
+                    </button>
                 </div>
             </div>
         </div>

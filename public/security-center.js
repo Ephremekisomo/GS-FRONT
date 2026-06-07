@@ -518,6 +518,127 @@ document.getElementById('btn-sound-toggle').addEventListener('click', () => {
     }
 });
 
+// Call state
+let adminCallState = {
+    incomingCall: null,
+    peerConnection: null,
+    localStream: null
+};
+
+// =====================
+// WEBRTC VIDEO/Voice CALLS - SECURITY CENTER
+// =====================
+
+function showIncomingCallModal(data) {
+    adminCallState.incomingCall = data;
+    document.getElementById('incoming-call-modal').classList.remove('hidden');
+    document.getElementById('incoming-call-user').textContent = data.callerName || 'Citoyen';
+    document.getElementById('incoming-call-type').innerHTML = 
+        data.type === 'video' ? '<i class="fas fa-video"></i> Appel video' : '<i class="fas fa-phone"></i> Appel vocal';
+    
+    const locationContainer = document.getElementById('incoming-call-location-container');
+    if (data.quartier || data.avenue) {
+        locationContainer.style.display = 'flex';
+        document.getElementById('incoming-call-location').textContent = 
+            `${data.quartier || ''} ${data.quartier && data.avenue ? ', ' : ''}${data.avenue || ''}`;
+    } else {
+        locationContainer.style.display = 'none';
+    }
+}
+
+function showActiveCallModal() {
+    document.getElementById('active-call-modal').classList.remove('hidden');
+    
+    const modal = document.getElementById('active-call-modal');
+    if (adminCallState.incomingCall && adminCallState.incomingCall.type === 'audio') {
+        modal.classList.add('audio-only');
+    } else {
+        modal.classList.remove('audio-only');
+    }
+    
+    const locationText = document.getElementById('call-location-text');
+    if (adminCallState.incomingCall && (adminCallState.incomingCall.quartier || adminCallState.incomingCall.avenue)) {
+        locationText.textContent = `${adminCallState.incomingCall.quartier || ''} ${adminCallState.incomingCall.quartier && adminCallState.incomingCall.avenue ? ', ' : ''}${adminCallState.incomingCall.avenue || ''}`;
+    } else {
+        locationText.textContent = 'Position non disponible';
+    }
+}
+
+document.getElementById('btn-answer-call').addEventListener('click', async () => {
+    if (!adminCallState.incomingCall) return;
+    
+    try {
+        adminCallState.localStream = await navigator.mediaDevices.getUserMedia({
+            audio: true,
+            video: adminCallState.incomingCall.type === 'video'
+        });
+        
+        if (adminCallState.incomingCall.type === 'video') {
+            document.getElementById('local-video').srcObject = adminCallState.localStream;
+        }
+        
+        document.getElementById('incoming-call-modal').classList.add('hidden');
+        showActiveCallModal();
+        
+        // Signal to citizen that call is accepted
+        socket.emit('admin-answer-call', {
+            callerId: adminCallState.incomingCall.callerId,
+            adminId: currentUser.id,
+            adminName: `${currentUser.nom} ${currentUser.prenom}`
+        });
+        
+        showToast('Appel connecte', 'success');
+    } catch (error) {
+        console.error('Error answering call:', error);
+        showToast('Erreur: Impossible d\'acceder au microphone', 'error');
+        rejectCall();
+    }
+});
+
+document.getElementById('btn-reject-call').addEventListener('click', () => {
+    if (adminCallState.incomingCall) {
+        socket.emit('reject-call', { callerId: adminCallState.incomingCall.callerId });
+    }
+    document.getElementById('incoming-call-modal').classList.add('hidden');
+    adminCallState.incomingCall = null;
+    showToast('Appel rejete', 'info');
+});
+
+document.getElementById('btn-end-call').addEventListener('click', () => {
+    if (adminCallState.incomingCall) {
+        socket.emit('end-call', { callerId: adminCallState.incomingCall.callerId });
+    }
+    endCall();
+    showToast('Appel termine', 'info');
+});
+
+document.getElementById('btn-mute').addEventListener('click', () => {
+    if (adminCallState.localStream) {
+        const audioTracks = adminCallState.localStream.getAudioTracks();
+        audioTracks.forEach(track => track.enabled = false);
+        document.getElementById('btn-mute').classList.add('muted');
+    }
+});
+
+function endCall() {
+    if (adminCallState.localStream) {
+        adminCallState.localStream.getTracks().forEach(track => track.stop());
+        adminCallState.localStream = null;
+    }
+    
+    document.getElementById('active-call-modal').classList.add('hidden');
+    document.getElementById('local-video').srcObject = null;
+    document.getElementById('remote-video').srcObject = null;
+    adminCallState.incomingCall = null;
+}
+
+function rejectCall() {
+    if (adminCallState.incomingCall) {
+        socket.emit('reject-call', { callerId: adminCallState.incomingCall.callerId });
+        adminCallState.incomingCall = null;
+    }
+}
+
 function initSocket() {
     if (socket && socket.connected) return;
     
@@ -605,6 +726,31 @@ function initSocket() {
             loadMessages(currentChatUser.id);
         }
         loadChatUsers();
+    });
+
+    // Listen for citizen calls
+    socket.on('citizen-call', (data) => {
+        console.log('Citizen call received:', data);
+        showIncomingCallModal(data);
+    });
+
+    // Listen for call rejection
+    socket.on('call-rejected', (data) => {
+        document.getElementById('active-call-modal').classList.add('hidden');
+        if (adminCallState.localStream) {
+            adminCallState.localStream.getTracks().forEach(track => track.stop());
+            adminCallState.localStream = null;
+        }
+        showToast('Appel rejete', 'info');
+    });
+
+    // Listen for call ended
+    socket.on('call-ended', () => {
+        document.getElementById('active-call-modal').classList.add('hidden');
+        if (adminCallState.localStream) {
+            adminCallState.localStream.getTracks().forEach(track => track.stop());
+            adminCallState.localStream = null;
+        }
     });
 
     setInterval(() => {

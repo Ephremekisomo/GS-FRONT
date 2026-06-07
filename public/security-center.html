@@ -197,6 +197,57 @@
             </div>
         </section>
 
+        <!-- Incoming Call Modal -->
+        <div id="incoming-call-modal" class="modal hidden">
+            <div class="modal-content incoming-call-content">
+                <div class="incoming-call-animation">
+                    <i class="fas fa-phone-volume"></i>
+                </div>
+                <h3 id="incoming-call-title">Appel entrant</h3>
+                <p id="incoming-call-type" class="incoming-call-type">Appel vocal de <span id="incoming-call-user"></span></p>
+                <div class="incoming-call-location" id="incoming-call-location-container">
+                    <i class="fas fa-map-marker-alt"></i>
+                    <span id="incoming-call-location">Position detectee...</span>
+                </div>
+                <div class="incoming-call-actions">
+                    <button id="btn-reject-call" class="call-action-btn reject">
+                        <i class="fas fa-phone-slash"></i>
+                    </button>
+                    <button id="btn-answer-call" class="call-action-btn answer">
+                        <i class="fas fa-phone"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Active Call Modal -->
+        <div id="active-call-modal" class="modal hidden">
+            <div class="modal-content active-call-content">
+                <div class="call-header-info">
+                    <h3 id="call-status">Connexion en cours...</h3>
+                    <div id="call-location-info" class="call-location-info">
+                        <i class="fas fa-map-marker-alt"></i>
+                        <span id="call-location-text"></span>
+                    </div>
+                </div>
+                <div class="video-container" id="video-container">
+                    <video id="remote-video" autoplay playsinline></video>
+                    <video id="local-video" autoplay playsinline muted></video>
+                </div>
+                <div class="call-controls">
+                    <button id="btn-mute" class="call-control-btn">
+                        <i class="fas fa-microphone"></i>
+                    </button>
+                    <button id="btn-video-off" class="call-control-btn" style="display: none;">
+                        <i class="fas fa-video-slash"></i>
+                    </button>
+                    <button id="btn-end-call" class="call-control-btn end">
+                        <i class="fas fa-phone-slash"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- Toast -->
         <div id="toast" class="toast hidden"></div>
         

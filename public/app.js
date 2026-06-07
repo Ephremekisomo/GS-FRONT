@@ -970,6 +970,7 @@ async function sendVoiceMessage(audioBlob, extension = 'webm') {
 // Initialize voice recording when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
     setTimeout(initVoiceRecording, 1000);
+    setTimeout(initCallSocket, 1000);
 });
 
 // Listen for new chat messages via Socket.IO
@@ -1211,6 +1212,7 @@ function initSocket() {
     });
     
     initChatSocket();
+    initCallSocket();
 }
 
 // =====================
@@ -1260,6 +1262,278 @@ if ('serviceWorker' in navigator) {
             .catch(error => {
                 console.log('SW registration failed:', error);
             });
+    });
+}
+
+// =====================
+// WEBRTC VIDEO/Voice CALLS
+// =====================
+
+let peerConnection = null;
+let localStream = null;
+let remoteStream = null;
+let isVideoCall = false;
+let isMuted = false;
+let isVideoOff = false;
+let currentCallData = null;
+
+// ICE servers configuration (using public STUN servers)
+const ICE_SERVERS = {
+    iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' }
+    ]
+};
+
+// Open call modal
+document.getElementById('btn-call').addEventListener('click', () => {
+    document.getElementById('call-modal').classList.remove('hidden');
+});
+
+// Close call modal
+document.querySelectorAll('#call-modal .close-modal').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.getElementById('call-modal').classList.add('hidden');
+    });
+});
+
+// Audio call button
+document.getElementById('btn-audio-call').addEventListener('click', () => {
+    isVideoCall = false;
+    document.getElementById('call-modal').classList.add('hidden');
+    startOutgoingCall();
+});
+
+// Video call button
+document.getElementById('btn-video-call').addEventListener('click', () => {
+    isVideoCall = true;
+    document.getElementById('call-modal').classList.add('hidden');
+    startOutgoingCall();
+});
+
+// Start outgoing call
+async function startOutgoingCall() {
+    try {
+        // Get user media
+        localStream = await navigator.mediaDevices.getUserMedia({
+            audio: true,
+            video: isVideoCall
+        });
+
+        // Show active call modal
+        showActiveCallModal(true);
+
+        // Get admin user id to send call signal
+        const adminId = await getAdminId();
+        if (!adminId) {
+            showToast('Centre de securite non disponible', 'error');
+            endCall();
+            return;
+        }
+
+        // Send call signal via socket
+        const callData = {
+            callerId: currentUser.id,
+            callerName: `${currentUser.nom} ${currentUser.prenom}`,
+            callerRole: currentUser.role,
+            latitude: currentPosition?.lat || null,
+            longitude: currentPosition?.lng || null,
+            quartier: currentQuartier || null,
+            avenue: currentAvenue || null,
+            type: isVideoCall ? 'video' : 'audio',
+            timestamp: new Date().toISOString()
+        };
+
+        socket.emit('citizen-call', callData);
+        currentCallData = callData;
+
+        showToast(`${isVideoCall ? 'Appel video' : 'Appel vocal'} en cours...`, 'info');
+
+    } catch (error) {
+        console.error('Error starting call:', error);
+        showToast('Erreur: Impossible d\'acceder au microphone' + (isVideoCall ? ' et a la camera' : ''), 'error');
+        endCall();
+    }
+}
+
+// Get admin ID
+async function getAdminId() {
+    try {
+        const response = await fetch(`${API_URL}/api/chat/admin-id`);
+        const data = await response.json();
+        return data.adminId;
+    } catch (error) {
+        console.error('Error getting admin id:', error);
+        return null;
+    }
+}
+
+// Show active call modal
+function showActiveCallModal(isOutgoing) {
+    const modal = document.getElementById('active-call-modal');
+    modal.classList.remove('hidden');
+    
+    if (!isVideoCall) {
+        modal.classList.add('audio-only');
+    } else {
+        modal.classList.remove('audio-only');
+    }
+
+    // Update location display
+    const locationText = document.getElementById('call-location-text');
+    if (currentQuartier && currentAvenue) {
+        locationText.textContent = `${currentQuartier}, ${currentAvenue}`;
+    } else if (currentQuartier) {
+        locationText.textContent = currentQuartier;
+    } else {
+        locationText.textContent = 'Position non disponible';
+    }
+
+    // Setup video streams if video call
+    if (isVideoCall && localStream) {
+        document.getElementById('local-video').srcObject = localStream;
+    } else if (!isVideoCall && localStream) {
+        // For audio-only call, create a visual avatar
+        const remoteVideo = document.getElementById('remote-video');
+        remoteVideo.innerHTML = '<div class="audio-only-avatar"><i class="fas fa-user-circle"></i></div>';
+    }
+}
+
+// Incoming call handler
+function handleIncomingCall(data) {
+    currentCallData = data;
+    document.getElementById('incoming-call-modal').classList.remove('hidden');
+    document.getElementById('incoming-call-user').textContent = data.callerName || 'Citoyen';
+    document.getElementById('incoming-call-type').innerHTML = 
+        data.type === 'video' ? '<i class="fas fa-video"></i> Appel video' : '<i class="fas fa-phone"></i> Appel vocal';
+    
+    const locationContainer = document.getElementById('incoming-call-location-container');
+    if (data.quartier || data.avenue) {
+        locationContainer.style.display = 'flex';
+        document.getElementById('incoming-call-location').textContent = 
+            `${data.quartier || ''} ${data.quartier && data.avenue ? ', ' : ''}${data.avenue || ''}`;
+        // Show caller position on map
+        showCallerPosition(data.latitude, data.longitude);
+    } else {
+        locationContainer.style.display = 'none';
+    }
+}
+
+// Show caller position on map
+function showCallerPosition(lat, lng) {
+    if (lat && lng && map) {
+        map.setView([lat, lng], 15);
+        L.popup()
+            .setLatLng([lat, lng])
+            .setContent('<b>Appel en cours</b><br>Position du citoyen')
+            .openOn(map);
+    }
+}
+
+// Accept incoming call
+document.getElementById('btn-answer-call').addEventListener('click', async () => {
+    if (!currentCallData) return;
+    
+    document.getElementById('incoming-call-modal').classList.add('hidden');
+    
+    try {
+        // Get admin media
+        localStream = await navigator.mediaDevices.getUserMedia({
+            audio: true,
+            video: currentCallData.type === 'video'
+        });
+
+        // Send answer signal
+        socket.emit('admin-answer-call', {
+            callerId: currentCallData.callerId,
+            accepted: true
+        });
+
+        showActiveCallModal(false);
+
+    } catch (error) {
+        console.error('Error answering call:', error);
+        showToast('Erreur: Impossible d\'acceder au microphone' + 
+            (currentCallData.type === 'video' ? ' et a la camera' : ''), 'error');
+        rejectCall();
+    }
+});
+
+// Reject call
+document.getElementById('btn-reject-call').addEventListener('click', () => {
+    if (currentCallData) {
+        socket.emit('reject-call', { callerId: currentCallData.callerId });
+    }
+    document.getElementById('incoming-call-modal').classList.add('hidden');
+    currentCallData = null;
+    showToast('Appel rejete', 'info');
+});
+
+// End call
+document.getElementById('btn-end-call').addEventListener('click', () => {
+    endCall();
+    showToast('Appel termine', 'info');
+});
+
+// Toggle mute
+document.getElementById('btn-mute').addEventListener('click', () => {
+    if (localStream) {
+        isMuted = !isMuted;
+        localStream.getAudioTracks().forEach(track => {
+            track.enabled = !isMuted;
+        });
+        document.getElementById('btn-mute').classList.toggle('muted', isMuted);
+        document.getElementById('btn-mute').innerHTML = 
+            isMuted ? '<i class="fas fa-microphone-slash"></i>' : '<i class="fas fa-microphone"></i>';
+    }
+});
+
+// Toggle video off (for video calls)
+document.getElementById('btn-video-off').addEventListener('click', () => {
+    if (localStream && isVideoCall) {
+        isVideoOff = !isVideoOff;
+        localStream.getVideoTracks().forEach(track => {
+            track.enabled = !isVideoOff;
+        });
+        document.getElementById('btn-video-off').classList.toggle('active', isVideoOff);
+    }
+});
+
+// End call function
+function endCall() {
+    if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+        localStream = null;
+    }
+    
+    if (peerConnection) {
+        peerConnection.close();
+        peerConnection = null;
+    }
+
+    document.getElementById('active-call-modal').classList.add('hidden');
+    document.getElementById('local-video').srcObject = null;
+    document.getElementById('remote-video').srcObject = null;
+}
+
+// Socket listeners for calls
+function initCallSocket() {
+    if (!socket) return;
+
+    // Listen for incoming call from admin/security center
+    socket.on('admin-incoming-call', (data) => {
+        handleIncomingCall(data);
+    });
+
+    // Listen for call rejected
+    socket.on('call-rejected', () => {
+        showToast('Appel rejete par le centre de securite', 'error');
+        endCall();
+    });
+
+    // Listen for call ended
+    socket.on('call-ended', () => {
+        endCall();
     });
 }
 
