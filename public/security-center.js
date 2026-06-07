@@ -522,8 +522,57 @@ document.getElementById('btn-sound-toggle').addEventListener('click', () => {
 let adminCallState = {
     incomingCall: null,
     peerConnection: null,
-    localStream: null
+    localStream: null,
+    pendingOffer: null
 };
+
+const ICE_SERVERS_ADMIN = {
+    iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' }
+    ]
+};
+
+function createPeerConnectionAdmin() {
+    if (!adminCallState.peerConnection) {
+        adminCallState.peerConnection = new RTCPeerConnection(ICE_SERVERS_ADMIN);
+        
+        adminCallState.peerConnection.onicecandidate = (event) => {
+            if (event.candidate) {
+                socket.emit('webrtc-ice-candidate', {
+                    callerId: adminCallState.incomingCall?.callerId,
+                    target: 'citizen',
+                    candidate: event.candidate
+                });
+            }
+        };
+        
+        adminCallState.peerConnection.ontrack = (event) => {
+            console.log('Remote track received:', event);
+            const remoteVideo = document.getElementById('remote-video');
+            if (remoteVideo && event.streams[0]) {
+                remoteVideo.srcObject = event.streams[0];
+            }
+        };
+        
+        adminCallState.peerConnection.onconnectionstatechange = () => {
+            console.log('Connection state:', adminCallState.peerConnection.connectionState);
+            if (adminCallState.peerConnection.connectionState === 'disconnected' || 
+                adminCallState.peerConnection.connectionState === 'failed') {
+                showToast('Appel termine', 'info');
+                adminEndCall();
+            }
+        };
+    }
+    
+    if (adminCallState.localStream) {
+        adminCallState.localStream.getTracks().forEach(track => {
+            adminCallState.peerConnection.addTrack(track, adminCallState.localStream);
+        });
+    }
+    
+    return adminCallState.peerConnection;
+}
 
 // =====================
 // WEBRTC VIDEO/Voice CALLS - SECURITY CENTER
@@ -543,6 +592,11 @@ function showIncomingCallModal(data) {
             `${data.quartier || ''} ${data.quartier && data.avenue ? ', ' : ''}${data.avenue || ''}`;
     } else {
         locationContainer.style.display = 'none';
+    }
+    
+    if (adminCallState.pendingOffer && adminCallState.pendingOffer.callerId === data.callerId) {
+        handleIncomingOffer(adminCallState.pendingOffer);
+        adminCallState.pendingOffer = null;
     }
 }
 
@@ -580,7 +634,10 @@ document.getElementById('btn-answer-call').addEventListener('click', async () =>
         document.getElementById('incoming-call-modal').classList.add('hidden');
         showActiveCallModal();
         
-        // Signal to citizen that call is accepted
+        if (adminCallState.incomingCall.type === 'video') {
+            createPeerConnectionAdmin();
+        }
+        
         socket.emit('admin-answer-call', {
             callerId: adminCallState.incomingCall.callerId,
             adminId: currentUser.id,
@@ -608,7 +665,7 @@ document.getElementById('btn-end-call').addEventListener('click', () => {
     if (adminCallState.incomingCall) {
         socket.emit('end-call', { callerId: adminCallState.incomingCall.callerId });
     }
-    endCall();
+    adminEndCall();
     showToast('Appel termine', 'info');
 });
 
@@ -620,13 +677,19 @@ document.getElementById('btn-mute').addEventListener('click', () => {
     }
 });
 
-function endCall() {
+function adminEndCall() {
     if (adminCallState.localStream) {
         adminCallState.localStream.getTracks().forEach(track => track.stop());
         adminCallState.localStream = null;
     }
     
+    if (adminCallState.peerConnection) {
+        adminCallState.peerConnection.close();
+        adminCallState.peerConnection = null;
+    }
+    
     document.getElementById('active-call-modal').classList.add('hidden');
+    document.getElementById('incoming-call-modal').classList.add('hidden');
     document.getElementById('local-video').srcObject = null;
     document.getElementById('remote-video').srcObject = null;
     adminCallState.incomingCall = null;
@@ -736,20 +799,57 @@ function initSocket() {
 
     // Listen for call rejection
     socket.on('call-rejected', (data) => {
-        document.getElementById('active-call-modal').classList.add('hidden');
-        if (adminCallState.localStream) {
-            adminCallState.localStream.getTracks().forEach(track => track.stop());
-            adminCallState.localStream = null;
-        }
+        adminEndCall();
         showToast('Appel rejete', 'info');
     });
 
     // Listen for call ended
     socket.on('call-ended', () => {
-        document.getElementById('active-call-modal').classList.add('hidden');
-        if (adminCallState.localStream) {
-            adminCallState.localStream.getTracks().forEach(track => track.stop());
-            adminCallState.localStream = null;
+        adminEndCall();
+    });
+
+    // Listen for call Ended
+    socket.on('call-ended', () => {
+        adminEndCall();
+    });
+    
+    // WebRTC signaling for video calls
+    socket.on('webrtc-offer', async (data) => {
+        if (adminCallState.incomingCall && adminCallState.incomingCall.type === 'video') {
+            if (!adminCallState.peerConnection) {
+                adminCallState.pendingOffer = data;
+            } else {
+                await handleIncomingOffer(data);
+            }
+        }
+    });
+    
+    async function handleIncomingOffer(data) {
+        const pc = createPeerConnectionAdmin();
+        await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        socket.emit('webrtc-answer', {
+            callerId: adminCallState.incomingCall.callerId,
+            calleeId: currentUser.id,
+            sdp: pc.localDescription
+        });
+    }
+    
+    socket.on('webrtc-answer', async (data) => {
+        if (adminCallState.peerConnection && adminCallState.peerConnection.signalingState === 'have-local-offer') {
+            await adminCallState.peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
+            console.log('Remote description set from answer (admin)');
+        }
+    });
+    
+    socket.on('webrtc-ice-candidate', async (data) => {
+        if (adminCallState.peerConnection && data.candidate) {
+            try {
+                await adminCallState.peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+            } catch (e) {
+                console.error('Error adding ICE candidate (admin):', e);
+            }
         }
     });
 
