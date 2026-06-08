@@ -64,6 +64,7 @@ function showDashboard() {
 // =====================
 
 async function initApp() {
+    await loadCurrentUser();
     initMap();
     await loadAlerts();
     await loadStats();
@@ -71,6 +72,33 @@ async function initApp() {
     
     // Auto-refresh stats every 10 seconds
     setInterval(loadStats, 10000);
+}
+
+async function loadCurrentUser() {
+    try {
+        const token = localStorage.getItem('admin_token');
+        if (!token) return;
+        
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        currentUser = {
+            id: payload.id,
+            telephone: payload.telephone,
+            role: payload.role
+        };
+        
+        // Load full profile for name
+        const response = await fetch(`${API_URL}/api/user/profile`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (response.ok) {
+            const user = await response.json();
+            currentUser.nom = user.nom;
+            currentUser.prenom = user.prenom;
+        }
+    } catch (error) {
+        console.error('Error loading current user:', error);
+    }
 }
 
 // =====================
