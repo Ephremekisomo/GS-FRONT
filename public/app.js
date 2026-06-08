@@ -1186,38 +1186,68 @@ document.getElementById('enable-2fa-form').addEventListener('submit', async (e) 
 function initSocket() {
     if (socket && socket.connected) return;
     
-    socket = io(SOCKET_URL, {
-        reconnection: true,
-        reconnectionDelay: 1000,
-        reconnectionDelayMax: 5000,
-        reconnectionAttempts: Infinity,
-        transports: ['websocket', 'polling']
-    });
+    if (typeof io === 'undefined' && typeof window.io === 'undefined') {
+        console.warn('Socket.IO client not loaded yet, will retry...');
+        setTimeout(initSocket, 500);
+        return;
+    }
     
-    socket.on('connect', () => {
-        console.log('Connected to socket server');
-    });
+    const ioClient = typeof io !== 'undefined' ? io : window.io;
+    
+    try {
+        socket = ioClient(SOCKET_URL, {
+            reconnection: true,
+            reconnectionDelay: 1000,
+            reconnectionDelayMax: 5000,
+            reconnectionAttempts: Infinity,
+            transports: ['websocket', 'polling']
+        });
+        
+        socket.on('connect', () => {
+            console.log('Connected to socket server');
+        });
 
-    socket.on('reconnect', () => {
-        console.log('Reconnected to socket server');
-        if (currentUser) {
-            loadHistory();
+        socket.on('connect_error', (err) => {
+            console.error('Socket connection error:', err);
+        });
+
+        socket.on('reconnect', () => {
+            console.log('Reconnected to socket server');
+            if (currentUser) {
+                loadHistory();
+            }
+        });
+        
+        socket.on('new-alert', (data) => {
+            if (currentUser) {
+                loadHistory();
+            }
+        });
+        
+        socket.on('alert-updated', (data) => {
+            if (currentUser) {
+                loadHistory();
+            }
+        });
+        
+        initChatSocket();
+    } catch (e) {
+        console.error('Error initializing socket:', e);
+        setTimeout(initSocket, 2000);
+    }
+}
+
+async function waitForSocket(timeoutMs = 5000) {
+    const start = Date.now();
+    while (!socket || !socket.connected) {
+        if (Date.now() - start > timeoutMs) {
+            throw new Error('Timeout: impossible de se connecter au serveur');
         }
-    });
-    
-    socket.on('new-alert', (data) => {
-        if (currentUser) {
-            loadHistory();
+        if (!socket) {
+            initSocket();
         }
-    });
-    
-    socket.on('alert-updated', (data) => {
-        if (currentUser) {
-            loadHistory();
-        }
-    });
-    
-    initChatSocket();
+        await new Promise(r => setTimeout(r, 300));
+    }
 }
 
 // =====================
@@ -1426,15 +1456,12 @@ function initCallButtons() {
 async function startOutgoingCall() {
     try {
         if (!socket || !socket.connected) {
-            showToast('Connexion au serveur en cours... Veuillez reessayer dans quelques secondes.', 'warning');
-            // Tenter une reconnexion
-            if (!socket) {
-                initSocket();
-            }
-            // Attendre un peu la connexion
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            if (!socket || !socket.connected) {
-                throw new Error('Socket non connecte');
+            showToast('Connexion au serveur en cours...', 'warning');
+            try {
+                await waitForSocket(5000);
+            } catch (e) {
+                showToast('Impossible de se connecter au serveur. Verifiez votre connexion.', 'error');
+                return;
             }
         }
 
