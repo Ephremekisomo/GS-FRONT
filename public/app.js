@@ -1425,6 +1425,19 @@ function initCallButtons() {
 // Start outgoing call
 async function startOutgoingCall() {
     try {
+        if (!socket || !socket.connected) {
+            showToast('Connexion au serveur en cours... Veuillez reessayer dans quelques secondes.', 'warning');
+            // Tenter une reconnexion
+            if (!socket) {
+                initSocket();
+            }
+            // Attendre un peu la connexion
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            if (!socket || !socket.connected) {
+                throw new Error('Socket non connecte');
+            }
+        }
+
         const callModal = document.getElementById('call-modal');
         if (callModal) callModal.classList.add('hidden');
 
