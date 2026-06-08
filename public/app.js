@@ -1480,24 +1480,6 @@ async function startOutgoingCall() {
         endCall();
     }
 }
-            webrtcOffer: webrtcOfferData
-        });
-        
-        currentCallData = { callerId: currentUser.id, callerName: `${currentUser.nom} ${currentUser.prenom}` };
-        activeCall = { type: 'outgoing', stream: localStream };
-
-        showToast(`${isVideoCall ? 'Appel video' : 'Appel vocal'} en cours...`, 'info');
-
-        if (isVideoCall && localStream) {
-            document.getElementById('local-video').srcObject = localStream;
-        }
-
-    } catch (error) {
-        console.error('Error starting call:', error);
-        showToast('Erreur: Impossible d\'acceder au microphone' + (isVideoCall ? ' et a la camera' : ''), 'error');
-        endCall();
-    }
-}
 
 // Get admin ID
 async function getAdminId() {
