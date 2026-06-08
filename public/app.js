@@ -1460,19 +1460,25 @@ function initCallButtons() {
     });
 
     const btnAudioCall = document.getElementById('btn-audio-call');
+    console.log('btn-audio-call found:', !!btnAudioCall);
     if (btnAudioCall) {
         btnAudioCall.addEventListener('click', () => {
+            console.log('Audio call clicked');
             isVideoCall = false;
             document.getElementById('call-modal').classList.add('hidden');
+            console.log('Starting outgoing call...');
             startOutgoingCall();
         });
     }
 
     const btnVideoCall = document.getElementById('btn-video-call');
+    console.log('btn-video-call found:', !!btnVideoCall);
     if (btnVideoCall) {
         btnVideoCall.addEventListener('click', () => {
+            console.log('Video call clicked');
             isVideoCall = true;
             document.getElementById('call-modal').classList.add('hidden');
+            console.log('Starting outgoing call...');
             startOutgoingCall();
         });
     }
