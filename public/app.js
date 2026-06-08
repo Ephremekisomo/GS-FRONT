@@ -1300,6 +1300,68 @@ if ('serviceWorker' in navigator) {
     });
 }
 
+let ringtoneAudioContext = null;
+let ringtoneOscillators = [];
+let ringtoneInterval = null;
+
+function playRingtone() {
+    stopRingtone();
+    try {
+        ringtoneAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+        
+        function playRing() {
+            if (!currentCallData || !ringtoneAudioContext) return;
+            
+            const now = ringtoneAudioContext.currentTime;
+            
+            const osc1 = ringtoneAudioContext.createOscillator();
+            const gain1 = ringtoneAudioContext.createGain();
+            osc1.type = 'sine';
+            osc1.frequency.setValueAtTime(440, now);
+            gain1.gain.setValueAtTime(0.3, now);
+            gain1.gain.linearRampToValueAtTime(0, now + 1);
+            osc1.connect(gain1);
+            gain1.connect(ringtoneAudioContext.destination);
+            osc1.start(now);
+            osc1.stop(now + 1);
+            ringtoneOscillators.push(osc1);
+            
+            const osc2 = ringtoneAudioContext.createOscillator();
+            const gain2 = ringtoneAudioContext.createGain();
+            osc2.type = 'sine';
+            osc2.frequency.setValueAtTime(587.33, now + 1);
+            gain2.gain.setValueAtTime(0, now);
+            gain2.gain.linearRampToValueAtTime(0.3, now + 1);
+            gain2.gain.linearRampToValueAtTime(0, now + 2);
+            osc2.connect(gain2);
+            gain2.connect(ringtoneAudioContext.destination);
+            osc2.start(now);
+            osc2.stop(now + 2);
+            ringtoneOscillators.push(osc2);
+        }
+        
+        playRing();
+        ringtoneInterval = setInterval(playRing, 3000);
+    } catch (e) {
+        console.log('Ringtone failed:', e);
+    }
+}
+
+function stopRingtone() {
+    if (ringtoneInterval) {
+        clearInterval(ringtoneInterval);
+        ringtoneInterval = null;
+    }
+    ringtoneOscillators.forEach(osc => {
+        try { osc.stop(); } catch (e) {}
+    });
+    ringtoneOscillators = [];
+    if (ringtoneAudioContext) {
+        try { ringtoneAudioContext.close(); } catch (e) {}
+        ringtoneAudioContext = null;
+    }
+}
+
 // =====================
 // WEBRTC VIDEO/Voice CALLS
 // =====================
@@ -1340,10 +1402,20 @@ function createPeerConnection() {
     
     peerConnection.ontrack = (event) => {
         console.log('Remote track received:', event);
-        if (event.streams[0] && event.streams[0] === localStream) return;
         const remoteVideo = document.getElementById('remote-video');
         if (remoteVideo && event.streams[0]) {
             remoteVideo.srcObject = event.streams[0];
+            // Remove audio-only avatar if present
+            remoteVideo.innerHTML = '';
+        }
+    };
+    
+    peerConnection.oniceconnectionstatechange = () => {
+        console.log('ICE connection state:', peerConnection.iceConnectionState);
+        if (peerConnection.iceConnectionState === 'connected' || peerConnection.iceConnectionState === 'completed') {
+            socket.emit('call-connected');
+            const statusEl = document.getElementById('call-status');
+            if (statusEl) statusEl.textContent = 'Appel en cours';
         }
     };
     
@@ -1579,7 +1651,7 @@ function showActiveCallModal(isOutgoing) {
 function handleIncomingCall(data) {
     currentCallData = data;
     document.getElementById('incoming-call-modal').classList.remove('hidden');
-    document.getElementById('incoming-call-user').textContent = data.callerName || 'Citoyen';
+    document.getElementById('incoming-call-user').textContent = data.callerName || 'Centre de securite';
     document.getElementById('incoming-call-type').innerHTML = 
         data.type === 'video' ? '<i class="fas fa-video"></i> Appel video' : '<i class="fas fa-phone"></i> Appel vocal';
     
@@ -1588,11 +1660,11 @@ function handleIncomingCall(data) {
         locationContainer.style.display = 'flex';
         document.getElementById('incoming-call-location').textContent = 
             `${data.quartier || ''} ${data.quartier && data.avenue ? ', ' : ''}${data.avenue || ''}`;
-        // Show caller position on map
-        showCallerPosition(data.latitude, data.longitude);
     } else {
         locationContainer.style.display = 'none';
     }
+    
+    playRingtone();
 }
 
 // Show caller position on map
@@ -1617,6 +1689,8 @@ function rejectCall() {
     }
     currentCallData = null;
     activeCall = null;
+    stopRingtone();
+    document.getElementById('incoming-call-modal').classList.add('hidden');
 }
 
 // End call function
@@ -1635,6 +1709,7 @@ function endCall() {
     document.getElementById('incoming-call-modal').classList.add('hidden');
     document.getElementById('local-video').srcObject = null;
     document.getElementById('remote-video').srcObject = null;
+    stopRingtone();
 }
 
 // Socket listeners for calls
@@ -1673,6 +1748,13 @@ function initCallSocket() {
         });
     }
 
+    // Listen for call connected
+    socket.on('call-connected', () => {
+        console.log('Call connected!');
+        const statusEl = document.getElementById('call-status');
+        if (statusEl) statusEl.textContent = 'Appel en cours';
+    });
+    
     // Listen for call rejected
     socket.on('call-rejected', () => {
         showToast('Appel rejete par le centre de securite', 'error');

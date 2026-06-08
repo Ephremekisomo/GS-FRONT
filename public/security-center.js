@@ -554,6 +554,68 @@ let adminCallState = {
     pendingOffer: null
 };
 
+let ringtoneAudioContext = null;
+let ringtoneOscillators = [];
+let ringtoneInterval = null;
+
+function playRingtone() {
+    stopRingtone();
+    try {
+        ringtoneAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+        
+        function playRing() {
+            if (!adminCallState.incomingCall || !ringtoneAudioContext) return;
+            
+            const now = ringtoneAudioContext.currentTime;
+            
+            const osc1 = ringtoneAudioContext.createOscillator();
+            const gain1 = ringtoneAudioContext.createGain();
+            osc1.type = 'sine';
+            osc1.frequency.setValueAtTime(440, now);
+            gain1.gain.setValueAtTime(0.3, now);
+            gain1.gain.linearRampToValueAtTime(0, now + 1);
+            osc1.connect(gain1);
+            gain1.connect(ringtoneAudioContext.destination);
+            osc1.start(now);
+            osc1.stop(now + 1);
+            ringtoneOscillators.push(osc1);
+            
+            const osc2 = ringtoneAudioContext.createOscillator();
+            const gain2 = ringtoneAudioContext.createGain();
+            osc2.type = 'sine';
+            osc2.frequency.setValueAtTime(587.33, now + 1);
+            gain2.gain.setValueAtTime(0, now);
+            gain2.gain.linearRampToValueAtTime(0.3, now + 1);
+            gain2.gain.linearRampToValueAtTime(0, now + 2);
+            osc2.connect(gain2);
+            gain2.connect(ringtoneAudioContext.destination);
+            osc2.start(now);
+            osc2.stop(now + 2);
+            ringtoneOscillators.push(osc2);
+        }
+        
+        playRing();
+        ringtoneInterval = setInterval(playRing, 3000);
+    } catch (e) {
+        console.log('Ringtone failed:', e);
+    }
+}
+
+function stopRingtone() {
+    if (ringtoneInterval) {
+        clearInterval(ringtoneInterval);
+        ringtoneInterval = null;
+    }
+    ringtoneOscillators.forEach(osc => {
+        try { osc.stop(); } catch (e) {}
+    });
+    ringtoneOscillators = [];
+    if (ringtoneAudioContext) {
+        try { ringtoneAudioContext.close(); } catch (e) {}
+        ringtoneAudioContext = null;
+    }
+}
+
 const ICE_SERVERS_ADMIN = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
@@ -577,10 +639,18 @@ function createPeerConnectionAdmin() {
         
         adminCallState.peerConnection.ontrack = (event) => {
             console.log('Remote track received:', event);
-            if (event.streams[0] && event.streams[0] === adminCallState.localStream) return;
             const remoteVideo = document.getElementById('remote-video');
             if (remoteVideo && event.streams[0]) {
                 remoteVideo.srcObject = event.streams[0];
+                remoteVideo.innerHTML = '';
+            }
+        };
+        
+        adminCallState.peerConnection.oniceconnectionstatechange = () => {
+            console.log('ICE connection state:', adminCallState.peerConnection.iceConnectionState);
+            if (adminCallState.peerConnection.iceConnectionState === 'connected' || 
+                adminCallState.peerConnection.iceConnectionState === 'completed') {
+                updateCallStatus('Appel en cours');
             }
         };
         
@@ -609,10 +679,14 @@ function createPeerConnectionAdmin() {
 // WEBRTC VIDEO/Voice CALLS - SECURITY CENTER
 // =====================
 
+function updateCallStatus(text) {
+    const el = document.getElementById('call-status');
+    if (el) el.textContent = text;
+}
+
 async function handlePendingOffer() {
     if (!adminCallState.pendingOffer) return;
     
-    // Create peer connection if it doesn't exist (needed for audio calls too)
     if (!adminCallState.peerConnection) {
         createPeerConnectionAdmin();
     }
@@ -628,8 +702,29 @@ async function handlePendingOffer() {
             calleeId: currentUser.id,
             sdp: pc.localDescription
         });
+        
+        // Wait for connection to be established
+        pc.oniceconnectionstatechange = () => {
+            console.log('ICE connection state:', pc.iceConnectionState);
+            if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+                updateCallStatus('Appel en cours');
+            } else if (pc.iceConnectionState === 'failed') {
+                updateCallStatus('Connexion echouee');
+                showToast('Impossible d\'etablir la connexion', 'error');
+                setTimeout(adminEndCall, 2000);
+            }
+        };
+        
+        // Fallback: update after 3 seconds if ICE hasn't reported yet
+        setTimeout(() => {
+            if (pc.iceConnectionState === 'checking') {
+                updateCallStatus('Appel en cours');
+            }
+        }, 3000);
+        
     } catch (err) {
         console.error('Error handling pending offer:', err);
+        updateCallStatus('Erreur de connexion');
     } finally {
         adminCallState.pendingOffer = null;
     }
@@ -652,8 +747,9 @@ function showIncomingCallModal(data) {
     }
     
     if (adminCallState.pendingOffer && adminCallState.pendingOffer.callerId === data.callerId) {
-        // Ne pas ecraser l'offre WebRTC, juste confirmer l'appel
     }
+    
+    playRingtone();
 }
 
 function showActiveCallModal() {
@@ -676,6 +772,7 @@ function showActiveCallModal() {
 
 document.getElementById('btn-answer-call').addEventListener('click', async () => {
     if (!adminCallState.incomingCall) return;
+    stopRingtone();
     
     try {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -719,6 +816,7 @@ document.getElementById('btn-answer-call').addEventListener('click', async () =>
             ? 'Microphone utilise par une autre application.'
             : error.message || 'Impossible d\'acceder au microphone';
         showToast(msg, 'error');
+        stopRingtone();
         rejectCall();
     }
 });
@@ -729,6 +827,7 @@ document.getElementById('btn-reject-call').addEventListener('click', () => {
     }
     document.getElementById('incoming-call-modal').classList.add('hidden');
     adminCallState.incomingCall = null;
+    stopRingtone();
     showToast('Appel rejete', 'info');
 });
 
@@ -737,6 +836,7 @@ document.getElementById('btn-end-call').addEventListener('click', () => {
         socket.emit('end-call', { callerId: adminCallState.incomingCall.callerId });
     }
     adminEndCall();
+    stopRingtone();
     showToast('Appel termine', 'info');
 });
 
