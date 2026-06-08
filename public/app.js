@@ -1291,36 +1291,39 @@ const ICE_SERVERS = {
 };
 
 function createPeerConnection() {
-    if (!peerConnection) {
-        peerConnection = new RTCPeerConnection(ICE_SERVERS);
-        
-        peerConnection.onicecandidate = (event) => {
-            if (event.candidate) {
-                socket.emit('webrtc-ice-candidate', {
-                    callerId: currentUser.id,
-                    target: 'security-center',
-                    candidate: event.candidate
-                });
-            }
-        };
-        
-        peerConnection.ontrack = (event) => {
-            console.log('Remote track received:', event);
-            const remoteVideo = document.getElementById('remote-video');
-            if (remoteVideo && event.streams[0]) {
-                remoteVideo.srcObject = event.streams[0];
-            }
-        };
-        
-        peerConnection.onconnectionstatechange = () => {
-            console.log('Connection state:', peerConnection.connectionState);
-            if (peerConnection.connectionState === 'disconnected' || 
-                peerConnection.connectionState === 'failed') {
-                showToast('Appel termine', 'info');
-                endCall();
-            }
-        };
+    if (peerConnection) {
+        peerConnection.close();
+        peerConnection = null;
     }
+    
+    peerConnection = new RTCPeerConnection(ICE_SERVERS);
+    
+    peerConnection.onicecandidate = (event) => {
+        if (event.candidate) {
+            socket.emit('webrtc-ice-candidate', {
+                callerId: currentUser.id,
+                target: 'security-center',
+                candidate: event.candidate
+            });
+        }
+    };
+    
+    peerConnection.ontrack = (event) => {
+        console.log('Remote track received:', event);
+        const remoteVideo = document.getElementById('remote-video');
+        if (remoteVideo && event.streams[0]) {
+            remoteVideo.srcObject = event.streams[0];
+        }
+    };
+    
+    peerConnection.onconnectionstatechange = () => {
+        console.log('Connection state:', peerConnection.connectionState);
+        if (peerConnection.connectionState === 'disconnected' || 
+            peerConnection.connectionState === 'failed') {
+            showToast('Appel termine', 'info');
+            endCall();
+        }
+    };
     
     // Always add tracks if localStream exists
     if (localStream) {
@@ -1429,26 +1432,25 @@ async function startOutgoingCall() {
 
         showActiveCallModal(true);
         
-        // For video calls, create peer connection and prepare offer
-        let webrtcOfferData = null;
-        if (isVideoCall) {
-            createPeerConnection();
-            // Add tracks immediately
-            if (localStream) {
-                localStream.getTracks().forEach(track => {
-                    if (!peerConnection.getSenders().some(s => s.track === track)) {
-                        peerConnection.addTrack(track, localStream);
-                    }
-                });
-            }
-            
-            // Create offer
-            const offer = await peerConnection.createOffer();
-            await peerConnection.setLocalDescription(offer);
-            webrtcOfferData = {
-                sdp: peerConnection.localDescription
-            };
+        // Always create peer connection for WebRTC (audio + video)
+        createPeerConnection();
+        
+        // Add tracks immediately
+        if (localStream) {
+            localStream.getTracks().forEach(track => {
+                if (!peerConnection.getSenders().some(s => s.track === track)) {
+                    peerConnection.addTrack(track, localStream);
+                }
+            });
         }
+        
+        // Create offer for both audio and video calls
+        const offer = await peerConnection.createOffer();
+        await peerConnection.setLocalDescription(offer);
+        
+        const webrtcOfferData = {
+            sdp: peerConnection.localDescription
+        };
 
         socket.emit('citizen-call', {
             callerId: currentUser.id,
@@ -1460,6 +1462,24 @@ async function startOutgoingCall() {
             avenue: currentAvenue || null,
             type: isVideoCall ? 'video' : 'audio',
             timestamp: new Date().toISOString(),
+            webrtcOffer: webrtcOfferData
+        });
+        
+        currentCallData = { callerId: currentUser.id, callerName: `${currentUser.nom} ${currentUser.prenom}` };
+        activeCall = { type: 'outgoing', stream: localStream };
+
+        showToast(`${isVideoCall ? 'Appel video' : 'Appel vocal'} en cours...`, 'info');
+
+        if (isVideoCall && localStream) {
+            document.getElementById('local-video').srcObject = localStream;
+        }
+
+    } catch (error) {
+        console.error('Error starting call:', error);
+        showToast('Erreur: Impossible d\'acceder au microphone' + (isVideoCall ? ' et a la camera' : ''), 'error');
+        endCall();
+    }
+}
             webrtcOffer: webrtcOfferData
         });
         

@@ -598,8 +598,8 @@ function showIncomingCallModal(data) {
     }
     
     if (adminCallState.pendingOffer && adminCallState.pendingOffer.callerId === data.callerId) {
-        handleIncomingOffer(adminCallState.pendingOffer);
-        adminCallState.pendingOffer = null;
+        // Stocker l'offre pour traitement ultérieur si la connexion n'est pas prête
+        adminCallState.pendingOffer = data;
     }
 }
 
@@ -632,14 +632,16 @@ document.getElementById('btn-answer-call').addEventListener('click', async () =>
         
         if (adminCallState.incomingCall.type === 'video') {
             document.getElementById('local-video').srcObject = adminCallState.localStream;
-            createPeerConnectionAdmin();
         }
+        
+        // Create peer connection for both audio and video calls
+        createPeerConnectionAdmin();
         
         document.getElementById('incoming-call-modal').classList.add('hidden');
         showActiveCallModal();
         
         // If we have a pending offer from citizen, respond to it
-        if (adminCallState.pendingOffer && adminCallState.incomingCall.type === 'video') {
+        if (adminCallState.pendingOffer) {
             await handlePendingOffer();
         }
         
@@ -818,20 +820,27 @@ function initSocket() {
         adminEndCall();
     });
     
-    // WebRTC signaling for video calls
+    // WebRTC signaling for calls (audio + video)
     socket.on('webrtc-offer', async (data) => {
         console.log('WebRTC offer received:', data);
-        if (adminCallState.incomingCall && adminCallState.incomingCall.type === 'video') {
+        // Store offer regardless of call state to handle race conditions
+        if (!adminCallState.pendingOffer || adminCallState.pendingOffer.callerId !== data.callerId) {
             adminCallState.pendingOffer = data;
-            // If peer connection exists, handle immediately
-            if (adminCallState.peerConnection) {
-                await handlePendingOffer();
-            }
+        }
+        // If we have an active incoming call and peer connection, handle immediately
+        if (adminCallState.incomingCall && adminCallState.peerConnection) {
+            await handlePendingOffer();
         }
     });
     
     async function handlePendingOffer() {
         if (!adminCallState.pendingOffer) return;
+        
+        // Create peer connection if it doesn't exist (needed for audio calls too)
+        if (!adminCallState.peerConnection) {
+            createPeerConnectionAdmin();
+        }
+        
         const pc = adminCallState.peerConnection;
         try {
             await pc.setRemoteDescription(new RTCSessionDescription(adminCallState.pendingOffer.sdp));
