@@ -981,9 +981,12 @@ section.active {
     display: none !important;
 }
 
-/* Ensure call modals are hidden on page load */
+/* Ensure call modals are hidden on page load by default */
 #call-modal, #incoming-call-modal, #active-call-modal {
-    display: none !important;
+    display: none;
+}
+#call-modal:not(.hidden), #incoming-call-modal:not(.hidden), #active-call-modal:not(.hidden) {
+    display: flex;
 }
 
 .modal-content {
