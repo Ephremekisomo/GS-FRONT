@@ -1378,7 +1378,12 @@ let currentCallData = null;
 const ICE_SERVERS = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' }
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun3.l.google.com:19302' },
+        { urls: 'stun:stun4.l.google.com:19302' },
+        { urls: 'stun:openrelay.metered.ca:80' },
+        { urls: 'stun:global.stun.twilio.com:3478' }
     ]
 };
 
@@ -1422,8 +1427,7 @@ function createPeerConnection() {
     peerConnection.onconnectionstatechange = () => {
         console.log('Connection state:', peerConnection.connectionState);
         if (peerConnection.connectionState === 'failed') {
-            showToast('Appel termine (connexion echouee)', 'info');
-            endCall();
+            showToast('Connexion difficile, essayez de raccrocher et rappeler', 'warning');
         }
     };
     

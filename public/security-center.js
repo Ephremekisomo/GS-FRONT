@@ -619,7 +619,12 @@ function stopRingtone() {
 const ICE_SERVERS_ADMIN = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' }
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun3.l.google.com:19302' },
+        { urls: 'stun:stun4.l.google.com:19302' },
+        { urls: 'stun:openrelay.metered.ca:80' },
+        { urls: 'stun:global.stun.twilio.com:3478' }
     ]
 };
 
@@ -657,8 +662,7 @@ function createPeerConnectionAdmin() {
         adminCallState.peerConnection.onconnectionstatechange = () => {
             console.log('Connection state:', adminCallState.peerConnection.connectionState);
             if (adminCallState.peerConnection.connectionState === 'failed') {
-                showToast('Appel termine (connexion echouee)', 'info');
-                adminEndCall();
+                showToast('Connexion difficile, essayez de raccrocher et rappeler', 'warning');
             }
         };
     }
@@ -710,8 +714,7 @@ async function handlePendingOffer() {
                 updateCallStatus('Appel en cours');
             } else if (pc.iceConnectionState === 'failed') {
                 updateCallStatus('Connexion echouee');
-                showToast('Impossible d\'etablir la connexion', 'error');
-                setTimeout(adminEndCall, 2000);
+                showToast('Connexion difficile. L\'appel peut ne pas fonctionner correctement.', 'warning');
             }
         };
         
