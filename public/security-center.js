@@ -581,6 +581,32 @@ function createPeerConnectionAdmin() {
 // WEBRTC VIDEO/Voice CALLS - SECURITY CENTER
 // =====================
 
+async function handlePendingOffer() {
+    if (!adminCallState.pendingOffer) return;
+    
+    // Create peer connection if it doesn't exist (needed for audio calls too)
+    if (!adminCallState.peerConnection) {
+        createPeerConnectionAdmin();
+    }
+    
+    const pc = adminCallState.peerConnection;
+    try {
+        await pc.setRemoteDescription(new RTCSessionDescription(adminCallState.pendingOffer.sdp));
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        const targetCallerId = adminCallState.pendingOffer.callerId || adminCallState.incomingCall?.callerId;
+        socket.emit('webrtc-answer', {
+            callerId: targetCallerId,
+            calleeId: currentUser.id,
+            sdp: pc.localDescription
+        });
+    } catch (err) {
+        console.error('Error handling pending offer:', err);
+    } finally {
+        adminCallState.pendingOffer = null;
+    }
+}
+
 function showIncomingCallModal(data) {
     adminCallState.incomingCall = data;
     document.getElementById('incoming-call-modal').classList.remove('hidden');
@@ -843,32 +869,6 @@ function initSocket() {
             await handlePendingOffer();
         }
     });
-    
-    async function handlePendingOffer() {
-        if (!adminCallState.pendingOffer) return;
-        
-        // Create peer connection if it doesn't exist (needed for audio calls too)
-        if (!adminCallState.peerConnection) {
-            createPeerConnectionAdmin();
-        }
-        
-        const pc = adminCallState.peerConnection;
-        try {
-            await pc.setRemoteDescription(new RTCSessionDescription(adminCallState.pendingOffer.sdp));
-            const answer = await pc.createAnswer();
-            await pc.setLocalDescription(answer);
-            const targetCallerId = adminCallState.pendingOffer.callerId || adminCallState.incomingCall?.callerId;
-            socket.emit('webrtc-answer', {
-                callerId: targetCallerId,
-                calleeId: currentUser.id,
-                sdp: pc.localDescription
-            });
-        } catch (err) {
-            console.error('Error handling pending offer:', err);
-        } finally {
-            adminCallState.pendingOffer = null;
-        }
-    }
     
     socket.on('webrtc-answer', async (data) => {
         if (adminCallState.peerConnection && adminCallState.peerConnection.signalingState === 'have-local-offer') {
