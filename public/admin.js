@@ -6,8 +6,8 @@
 // CONFIGURATION
 // =====================
 
-const API_URL = 'https://goma-security-backend.onrender.com';
-const SOCKET_URL = 'https://goma-security-backend.onrender.com';
+const API_URL = 'https://gomasecures-backend.onrender.com';
+const SOCKET_URL = 'https://gomasecures-backend.onrender.com';
 
 // =====================
 // STATE
@@ -1295,8 +1295,8 @@ document.getElementById('change-password-form').addEventListener('submit', async
 
     try {
         const token = localStorage.getItem('admin_token');
-        const response = await fetch(`${API_URL}/api/user/change-password`, {
-            method: 'PUT',
+        const response = await fetch(`${API_URL}/api/auth/change-password`, {
+            method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
