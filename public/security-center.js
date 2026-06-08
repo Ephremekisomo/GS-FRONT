@@ -625,6 +625,10 @@ document.getElementById('btn-answer-call').addEventListener('click', async () =>
     if (!adminCallState.incomingCall) return;
     
     try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            throw new Error('getUserMedia non supporte (page doit etre en HTTPS ou localhost)');
+        }
+
         adminCallState.localStream = await navigator.mediaDevices.getUserMedia({
             audio: true,
             video: adminCallState.incomingCall.type === 'video'
@@ -654,7 +658,14 @@ document.getElementById('btn-answer-call').addEventListener('click', async () =>
         showToast('Appel connecte', 'success');
     } catch (error) {
         console.error('Error answering call:', error);
-        showToast('Erreur: Impossible d\'acceder au microphone', 'error');
+        const msg = error.name === 'NotAllowedError' 
+            ? 'Acces au microphone refuse. Autorisez l\'acces dans les parametres du navigateur.'
+            : error.name === 'NotFoundError'
+            ? 'Aucun microphone detecte sur cet appareil.'
+            : error.name === 'NotReadableError'
+            ? 'Microphone utilise par une autre application.'
+            : error.message || 'Impossible d\'acceder au microphone';
+        showToast(msg, 'error');
         rejectCall();
     }
 });
