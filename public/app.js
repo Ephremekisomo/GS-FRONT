@@ -1322,9 +1322,12 @@ function createPeerConnection() {
         };
     }
     
+    // Always add tracks if localStream exists
     if (localStream) {
         localStream.getTracks().forEach(track => {
-            peerConnection.addTrack(track, localStream);
+            if (!peerConnection.getSenders().some(s => s.track === track)) {
+                peerConnection.addTrack(track, localStream);
+            }
         });
     }
     
@@ -1425,15 +1428,29 @@ async function startOutgoingCall() {
         });
 
         showActiveCallModal(true);
-
-        const adminId = await getAdminId();
-        if (!adminId) {
-            showToast('Centre de securite non disponible', 'error');
-            endCall();
-            return;
+        
+        // For video calls, create peer connection and prepare offer
+        let webrtcOfferData = null;
+        if (isVideoCall) {
+            createPeerConnection();
+            // Add tracks immediately
+            if (localStream) {
+                localStream.getTracks().forEach(track => {
+                    if (!peerConnection.getSenders().some(s => s.track === track)) {
+                        peerConnection.addTrack(track, localStream);
+                    }
+                });
+            }
+            
+            // Create offer
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+            webrtcOfferData = {
+                sdp: peerConnection.localDescription
+            };
         }
 
-        const callData = {
+        socket.emit('citizen-call', {
             callerId: currentUser.id,
             callerName: `${currentUser.nom} ${currentUser.prenom}`,
             callerRole: currentUser.role,
@@ -1442,12 +1459,12 @@ async function startOutgoingCall() {
             quartier: currentQuartier || null,
             avenue: currentAvenue || null,
             type: isVideoCall ? 'video' : 'audio',
-            timestamp: new Date().toISOString()
-        };
-
-        socket.emit('citizen-call', callData);
-        currentCallData = callData;
-        activeCall = { type: 'outgoing', data: callData };
+            timestamp: new Date().toISOString(),
+            webrtcOffer: webrtcOfferData
+        });
+        
+        currentCallData = { callerId: currentUser.id, callerName: `${currentUser.nom} ${currentUser.prenom}` };
+        activeCall = { type: 'outgoing', stream: localStream };
 
         showToast(`${isVideoCall ? 'Appel video' : 'Appel vocal'} en cours...`, 'info');
 
@@ -1567,28 +1584,41 @@ function endCall() {
     document.getElementById('remote-video').srcObject = null;
 }
 
-// Socket listeners for calls (only for non-citizen users)
+// Socket listeners for calls
 function initCallSocket() {
     if (!socket) return;
-    
-    // Only initialize for admin/security center/poste users
-    if (!currentUser || currentUser.role === 'citoyen') return;
-    
+
     socket.on('admin-incoming-call', (data) => {
         handleIncomingCall(data);
-        
-        createPeerConnection();
-        peerConnection.createOffer().then(offer => {
-            return peerConnection.setLocalDescription(offer);
-        }).then(() => {
-            socket.emit('webrtc-offer', {
-                callerId: currentUser.id,
-                sdp: peerConnection.localDescription
-            });
-        }).catch(err => {
-            console.error('Error creating offer:', err);
-        });
     });
+
+    // For citizens: listen for webrtc-offer from admin to establish connection
+    if (currentUser && currentUser.role === 'citoyen') {
+        socket.on('webrtc-offer', async (data) => {
+            console.log('WebRTC offer received from admin:', data);
+            try {
+                createPeerConnection();
+                // Add local tracks before setting remote description
+                if (localStream) {
+                    localStream.getTracks().forEach(track => {
+                        if (!peerConnection.getSenders().some(s => s.track === track)) {
+                            peerConnection.addTrack(track, localStream);
+                        }
+                    });
+                }
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+                socket.emit('webrtc-answer', {
+                    callerId: currentUser.id,
+                    calleeId: data.callerId,
+                    sdp: peerConnection.localDescription
+                });
+            } catch (err) {
+                console.error('Error handling WebRTC offer:', err);
+            }
+        });
+    }
 
     // Listen for call rejected
     socket.on('call-rejected', () => {
@@ -1600,15 +1630,15 @@ function initCallSocket() {
     socket.on('call-ended', () => {
         endCall();
     });
-    
-    // WebRTC signaling for video calls
+
+    // WebRTC signaling
     socket.on('webrtc-answer', async (data) => {
         if (peerConnection && peerConnection.signalingState === 'have-local-offer') {
             await peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
             console.log('Remote description set from answer');
         }
     });
-    
+
     socket.on('webrtc-ice-candidate', async (data) => {
         if (peerConnection && data.candidate) {
             try {

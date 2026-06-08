@@ -565,9 +565,12 @@ function createPeerConnectionAdmin() {
         };
     }
     
+    // Always add tracks if localStream exists (avoid duplicates)
     if (adminCallState.localStream) {
         adminCallState.localStream.getTracks().forEach(track => {
-            adminCallState.peerConnection.addTrack(track, adminCallState.localStream);
+            if (!adminCallState.peerConnection.getSenders().some(s => s.track === track)) {
+                adminCallState.peerConnection.addTrack(track, adminCallState.localStream);
+            }
         });
     }
     
@@ -629,13 +632,15 @@ document.getElementById('btn-answer-call').addEventListener('click', async () =>
         
         if (adminCallState.incomingCall.type === 'video') {
             document.getElementById('local-video').srcObject = adminCallState.localStream;
+            createPeerConnectionAdmin();
         }
         
         document.getElementById('incoming-call-modal').classList.add('hidden');
         showActiveCallModal();
         
-        if (adminCallState.incomingCall.type === 'video') {
-            createPeerConnectionAdmin();
+        // If we have a pending offer from citizen, respond to it
+        if (adminCallState.pendingOffer && adminCallState.incomingCall.type === 'video') {
+            await handlePendingOffer();
         }
         
         socket.emit('admin-answer-call', {
@@ -815,25 +820,34 @@ function initSocket() {
     
     // WebRTC signaling for video calls
     socket.on('webrtc-offer', async (data) => {
+        console.log('WebRTC offer received:', data);
         if (adminCallState.incomingCall && adminCallState.incomingCall.type === 'video') {
-            if (!adminCallState.peerConnection) {
-                adminCallState.pendingOffer = data;
-            } else {
-                await handleIncomingOffer(data);
+            adminCallState.pendingOffer = data;
+            // If peer connection exists, handle immediately
+            if (adminCallState.peerConnection) {
+                await handlePendingOffer();
             }
         }
     });
     
-    async function handleIncomingOffer(data) {
-        const pc = createPeerConnectionAdmin();
-        await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-        socket.emit('webrtc-answer', {
-            callerId: adminCallState.incomingCall.callerId,
-            calleeId: currentUser.id,
-            sdp: pc.localDescription
-        });
+    async function handlePendingOffer() {
+        if (!adminCallState.pendingOffer) return;
+        const pc = adminCallState.peerConnection;
+        try {
+            await pc.setRemoteDescription(new RTCSessionDescription(adminCallState.pendingOffer.sdp));
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            const targetCallerId = adminCallState.pendingOffer.callerId || adminCallState.incomingCall?.callerId;
+            socket.emit('webrtc-answer', {
+                callerId: targetCallerId,
+                calleeId: currentUser.id,
+                sdp: pc.localDescription
+            });
+        } catch (err) {
+            console.error('Error handling pending offer:', err);
+        } finally {
+            adminCallState.pendingOffer = null;
+        }
     }
     
     socket.on('webrtc-answer', async (data) => {
