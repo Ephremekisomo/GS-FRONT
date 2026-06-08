@@ -577,6 +577,7 @@ function createPeerConnectionAdmin() {
         
         adminCallState.peerConnection.ontrack = (event) => {
             console.log('Remote track received:', event);
+            if (event.streams[0] && event.streams[0] === adminCallState.localStream) return;
             const remoteVideo = document.getElementById('remote-video');
             if (remoteVideo && event.streams[0]) {
                 remoteVideo.srcObject = event.streams[0];
@@ -585,9 +586,8 @@ function createPeerConnectionAdmin() {
         
         adminCallState.peerConnection.onconnectionstatechange = () => {
             console.log('Connection state:', adminCallState.peerConnection.connectionState);
-            if (adminCallState.peerConnection.connectionState === 'disconnected' || 
-                adminCallState.peerConnection.connectionState === 'failed') {
-                showToast('Appel termine', 'info');
+            if (adminCallState.peerConnection.connectionState === 'failed') {
+                showToast('Appel termine (connexion echouee)', 'info');
                 adminEndCall();
             }
         };
@@ -652,8 +652,7 @@ function showIncomingCallModal(data) {
     }
     
     if (adminCallState.pendingOffer && adminCallState.pendingOffer.callerId === data.callerId) {
-        // Stocker l'offre pour traitement ultérieur si la connexion n'est pas prête
-        adminCallState.pendingOffer = data;
+        // Ne pas ecraser l'offre WebRTC, juste confirmer l'appel
     }
 }
 

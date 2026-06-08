@@ -1491,8 +1491,10 @@ section.active {
     background: var(--warning-color);
 }
 
-.audio-only #local-video {
-    display: none;
+.audio-only #local-video,
+.audio-only #remote-video {
+    opacity: 0;
+    pointer-events: none;
 }
 
 .audio-only #remote-video {

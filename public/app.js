@@ -1340,6 +1340,7 @@ function createPeerConnection() {
     
     peerConnection.ontrack = (event) => {
         console.log('Remote track received:', event);
+        if (event.streams[0] && event.streams[0] === localStream) return;
         const remoteVideo = document.getElementById('remote-video');
         if (remoteVideo && event.streams[0]) {
             remoteVideo.srcObject = event.streams[0];
@@ -1348,9 +1349,8 @@ function createPeerConnection() {
     
     peerConnection.onconnectionstatechange = () => {
         console.log('Connection state:', peerConnection.connectionState);
-        if (peerConnection.connectionState === 'disconnected' || 
-            peerConnection.connectionState === 'failed') {
-            showToast('Appel termine', 'info');
+        if (peerConnection.connectionState === 'failed') {
+            showToast('Appel termine (connexion echouee)', 'info');
             endCall();
         }
     };
