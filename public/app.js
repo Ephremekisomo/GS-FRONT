@@ -1425,6 +1425,13 @@ function initCallButtons() {
 // Start outgoing call
 async function startOutgoingCall() {
     try {
+        const callModal = document.getElementById('call-modal');
+        if (callModal) callModal.classList.add('hidden');
+
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            throw new Error('getUserMedia non supporte (page doit etre en HTTPS ou localhost)');
+        }
+
         localStream = await navigator.mediaDevices.getUserMedia({
             audio: true,
             video: isVideoCall
@@ -1432,10 +1439,8 @@ async function startOutgoingCall() {
 
         showActiveCallModal(true);
         
-        // Always create peer connection for WebRTC (audio + video)
         createPeerConnection();
         
-        // Add tracks immediately
         if (localStream) {
             localStream.getTracks().forEach(track => {
                 if (!peerConnection.getSenders().some(s => s.track === track)) {
@@ -1444,7 +1449,6 @@ async function startOutgoingCall() {
             });
         }
         
-        // Create offer for both audio and video calls
         const offer = await peerConnection.createOffer();
         await peerConnection.setLocalDescription(offer);
         
@@ -1476,7 +1480,14 @@ async function startOutgoingCall() {
 
     } catch (error) {
         console.error('Error starting call:', error);
-        showToast('Erreur: Impossible d\'acceder au microphone' + (isVideoCall ? ' et a la camera' : ''), 'error');
+        const msg = error.name === 'NotAllowedError' 
+            ? 'Acces au microphone refuse par le navigateur. Autorisez l\'acces dans les parametres.'
+            : error.name === 'NotFoundError'
+            ? 'Aucun microphone detecte sur cet appareil.'
+            : error.name === 'NotReadableError'
+            ? 'Microphone utilise par une autre application.'
+            : error.message || 'Impossible d\'acceder au microphone';
+        showToast(msg, 'error');
         endCall();
     }
 }
