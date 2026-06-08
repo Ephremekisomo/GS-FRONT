@@ -1504,10 +1504,44 @@ function initCallButtons() {
 
     const btnRejectCall = document.getElementById('btn-reject-call');
     if (btnRejectCall) {
-        btnRejectCall.addEventListener('click', () => {
-            if (currentCallData) {
-                socket.emit('reject-call', { callerId: currentCallData.callerId });
-            }
+        btnRejectCall.addEventListener('click', rejectCall);
+    }
+    
+    initDraggableVideo();
+}
+
+function initDraggableVideo() {
+    const localVideo = document.getElementById('local-video');
+    if (!localVideo) return;
+    
+    let isDragging = false;
+    let startX, startY, initialX, initialY;
+    
+    localVideo.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        const rect = localVideo.getBoundingClientRect();
+        initialX = rect.left;
+        initialY = rect.top;
+        localVideo.style.cursor = 'grabbing';
+        e.preventDefault();
+    });
+    
+    document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+        localVideo.style.left = (initialX + dx) + 'px';
+        localVideo.style.top = (initialY + dy) + 'px';
+        localVideo.style.transform = 'none';
+    });
+    
+    document.addEventListener('mouseup', () => {
+        isDragging = false;
+        localVideo.style.cursor = 'move';
+    });
+}
             if (document.getElementById('incoming-call-modal')) {
                 document.getElementById('incoming-call-modal').classList.add('hidden');
             }
