@@ -1475,6 +1475,88 @@ function createPeerConnection() {
     return peerConnection;
 }
 
+// Show active call modal
+function showActiveCallModal(isOutgoing) {
+    const modal = document.getElementById('active-call-modal');
+    modal.classList.remove('hidden');
+    
+    if (!isVideoCall) {
+        modal.classList.add('audio-only');
+    } else {
+        modal.classList.remove('audio-only');
+    }
+
+    const locationText = document.getElementById('call-location-text');
+    if (currentQuartier && currentAvenue) {
+        locationText.textContent = `${currentQuartier}, ${currentAvenue}`;
+    } else if (currentQuartier) {
+        locationText.textContent = currentQuartier;
+    } else {
+        locationText.textContent = 'Position non disponible';
+    }
+
+    if (isVideoCall && localStream) {
+        document.getElementById('local-video').srcObject = localStream;
+    } else if (!isVideoCall && localStream) {
+        const remoteVideo = document.getElementById('remote-video');
+        remoteVideo.innerHTML = '<div class="audio-only-avatar"><i class="fas fa-user-circle"></i></div>';
+    }
+}
+
+// Incoming call handler
+function handleIncomingCall(data) {
+    currentCallData = data;
+    document.getElementById('incoming-call-modal').classList.remove('hidden');
+    document.getElementById('incoming-call-user').textContent = data.callerName || 'Centre de securite';
+    document.getElementById('incoming-call-type').innerHTML = 
+        data.type === 'video' ? '<i class="fas fa-video"></i> Appel video' : '<i class="fas fa-phone"></i> Appel vocal';
+    
+    const locationContainer = document.getElementById('incoming-call-location-container');
+    if (data.quartier || data.avenue) {
+        locationContainer.style.display = 'flex';
+        document.getElementById('incoming-call-location').textContent = 
+            `${data.quartier || ''} ${data.quartier && data.avenue ? ', ' : ''}${data.avenue || ''}`;
+    } else {
+        locationContainer.style.display = 'none';
+    }
+    
+    playRingtone();
+}
+
+// Reject call
+function rejectCall() {
+    if (currentCallData) {
+        socket.emit('reject-call', { callerId: currentCallData.callerId });
+    }
+    if (peerConnection) {
+        peerConnection.close();
+        peerConnection = null;
+    }
+    currentCallData = null;
+    activeCall = null;
+    stopRingtone();
+    document.getElementById('incoming-call-modal').classList.add('hidden');
+}
+
+// End call function
+function endCall() {
+    if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+        localStream = null;
+    }
+    
+    if (peerConnection) {
+        peerConnection.close();
+        peerConnection = null;
+    }
+
+    document.getElementById('active-call-modal').classList.add('hidden');
+    document.getElementById('incoming-call-modal').classList.add('hidden');
+    document.getElementById('local-video').srcObject = null;
+    document.getElementById('remote-video').srcObject = null;
+    stopRingtone();
+}
+
 // Start outgoing call
 async function startOutgoingCall() {
     try {
