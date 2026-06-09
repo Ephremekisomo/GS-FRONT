@@ -335,16 +335,35 @@ async function initApp() {
 async function loadEmergencyTypes() {
     try {
         const response = await fetch(`${API_URL}/api/emergency-types`);
-        emergencyTypes = await response.json();
-        renderEmergencyTypes();
+        if (response.ok) {
+            emergencyTypes = await response.json();
+        } else {
+            throw new Error('API returned ' + response.status);
+        }
     } catch (error) {
-        showToast('Erreur de chargement des types d\'urgence', 'error');
+        console.error('Error loading emergency types:', error);
+        emergencyTypes = [
+            { id: 1, nom: 'Vol', icone: 'fas fa-theft', priorite: 1, couleur: '#e74c3c' },
+            { id: 2, nom: 'Incendie', icone: 'fas fa-fire', priorite: 1, couleur: '#e67e22' },
+            { id: 3, nom: 'Accident', icone: 'fas fa-car-crash', priorite: 2, couleur: '#f39c12' },
+            { id: 4, nom: 'Agression', icone: 'fas fa-fist-raised', priorite: 1, couleur: '#c0392b' },
+            { id: 5, nom: 'Inondation', icone: 'fas fa-water', priorite: 2, couleur: '#3498db' },
+            { id: 6, nom: 'Autre', icone: 'fas fa-exclamation-circle', priorite: 3, couleur: '#95a5a6' }
+        ];
     }
+    renderEmergencyTypes();
 }
 
 // Render emergency types in form
 function renderEmergencyTypes() {
     const container = document.getElementById('emergency-types');
+    if (!container) return;
+    
+    if (emergencyTypes.length === 0) {
+        container.innerHTML = '<p style="text-align:center;color:#999;">Aucun type d\'urgence disponible</p>';
+        return;
+    }
+    
     container.innerHTML = emergencyTypes.map(type => `
         <button type="button" class="emergency-type-btn" data-id="${type.id}" data-priority="${type.priorite}" style="border-color: ${type.couleur}">
             <i class="fas ${type.icone}" style="color: ${type.couleur}"></i>
@@ -352,7 +371,6 @@ function renderEmergencyTypes() {
         </button>
     `).join('');
     
-    // Add click handlers
     container.querySelectorAll('.emergency-type-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             container.querySelectorAll('.emergency-type-btn').forEach(b => b.classList.remove('selected'));
