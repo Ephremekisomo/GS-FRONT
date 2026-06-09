@@ -1461,6 +1461,86 @@ function createPeerConnection() {
     return peerConnection;
 }
 
+// Start outgoing call
+async function startOutgoingCall() {
+    try {
+        if (!socket || !socket.connected) {
+            showToast('Connexion au serveur en cours...', 'warning');
+            try {
+                await waitForSocket(5000);
+            } catch (e) {
+                showToast('Impossible de se connecter au serveur.', 'error');
+                return;
+            }
+        }
+
+        const callModal = document.getElementById('call-modal');
+        if (callModal) callModal.classList.add('hidden');
+
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            throw new Error('getUserMedia non supporte (page doit etre en HTTPS ou localhost)');
+        }
+
+        localStream = await navigator.mediaDevices.getUserMedia({
+            audio: true,
+            video: isVideoCall
+        });
+
+        showActiveCallModal(true);
+        
+        createPeerConnection();
+        
+        if (localStream) {
+            localStream.getTracks().forEach(track => {
+                if (!peerConnection.getSenders().some(s => s.track === track)) {
+                    peerConnection.addTrack(track, localStream);
+                }
+            });
+        }
+        
+        const offer = await peerConnection.createOffer();
+        await peerConnection.setLocalDescription(offer);
+        
+        const webrtcOfferData = {
+            sdp: peerConnection.localDescription
+        };
+
+        socket.emit('citizen-call', {
+            callerId: currentUser.id,
+            callerName: `${currentUser.nom} ${currentUser.prenom}`,
+            callerRole: currentUser.role,
+            latitude: currentPosition?.lat || null,
+            longitude: currentPosition?.lng || null,
+            quartier: currentQuartier || null,
+            avenue: currentAvenue || null,
+            type: isVideoCall ? 'video' : 'audio',
+            timestamp: new Date().toISOString(),
+            webrtcOffer: webrtcOfferData
+        });
+        
+        currentCallData = { callerId: currentUser.id, callerName: `${currentUser.nom} ${currentUser.prenom}` };
+        activeCall = { type: 'outgoing', stream: localStream };
+
+        showToast(`${isVideoCall ? 'Appel video' : 'Appel vocal'} en cours...`, 'info');
+
+        if (isVideoCall && localStream) {
+            document.getElementById('local-video').srcObject = localStream;
+        }
+
+    } catch (error) {
+        console.error('Error starting call:', error);
+        const msg = error.name === 'NotAllowedError' 
+            ? 'Acces au microphone refuse par le navigateur. Autorisez l\'acces dans les parametres.'
+            : error.name === 'NotFoundError'
+            ? 'Aucun microphone detecte sur cet appareil.'
+            : error.name === 'NotReadableError'
+            ? 'Microphone utilise par une autre application.'
+            : error.message || 'Impossible d\'acceder au microphone';
+        showToast(msg, 'error');
+        endCall();
+    }
+}
+
 // Initialize call buttons
 function initCallButtons() {
     const btnCall = document.getElementById('btn-call');
