@@ -333,10 +333,20 @@ async function initApp() {
 
 // Load emergency types
 async function loadEmergencyTypes() {
+    console.log('Loading emergency types...');
+    const container = document.getElementById('emergency-types');
+    console.log('Container found:', !!container);
+    
     try {
-        const response = await fetch(`${API_URL}/api/emergency-types`);
+        console.log('Fetching from:', `${API_URL}/api/emergency-types`);
+        const response = await fetch(`${API_URL}/api/emergency-types`, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' }
+        });
+        console.log('Response status:', response.status);
         if (response.ok) {
             emergencyTypes = await response.json();
+            console.log('Emergency types loaded:', emergencyTypes.length);
         } else {
             throw new Error('API returned ' + response.status);
         }
@@ -351,13 +361,17 @@ async function loadEmergencyTypes() {
             { id: 6, nom: 'Autre', icone: 'fas fa-exclamation-circle', priorite: 3, couleur: '#95a5a6' }
         ];
     }
+    console.log('Rendering', emergencyTypes.length, 'emergency types');
     renderEmergencyTypes();
 }
 
 // Render emergency types in form
 function renderEmergencyTypes() {
     const container = document.getElementById('emergency-types');
-    if (!container) return;
+    if (!container) {
+        console.error('Container #emergency-types not found');
+        return;
+    }
     
     if (emergencyTypes.length === 0) {
         container.innerHTML = '<p style="text-align:center;color:#999;">Aucun type d\'urgence disponible</p>';
