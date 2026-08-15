@@ -1414,19 +1414,36 @@ let isVideoCall = false;
 let isMuted = false;
 let isVideoOff = false;
 let currentCallData = null;
-
-// ICE servers configuration (using public STUN servers)
-const ICE_SERVERS = {
+let ICE_SERVERS = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
         { urls: 'stun:stun2.l.google.com:19302' },
         { urls: 'stun:stun3.l.google.com:19302' },
         { urls: 'stun:stun4.l.google.com:19302' },
-        { urls: 'stun:openrelay.metered.ca:80' },
         { urls: 'stun:global.stun.twilio.com:3478' }
     ]
 };
+
+async function loadWebrtcConfig() {
+    try {
+        const response = await fetch(`${API_URL}/api/config/webrtc`, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' }
+        });
+
+        if (!response.ok) {
+            return;
+        }
+
+        const data = await response.json();
+        if (data && Array.isArray(data.iceServers) && data.iceServers.length > 0) {
+            ICE_SERVERS = { iceServers: data.iceServers };
+        }
+    } catch (error) {
+        console.warn('WebRTC config unavailable, using default STUN only:', error);
+    }
+}
 
 function createPeerConnection() {
     if (peerConnection) {
@@ -1451,7 +1468,8 @@ function createPeerConnection() {
         const remoteVideo = document.getElementById('remote-video');
         if (remoteVideo && event.streams[0]) {
             remoteVideo.srcObject = event.streams[0];
-            // Remove audio-only avatar if present
+            remoteVideo.muted = false;
+            remoteVideo.play().catch(() => console.log('Autoplay remote video blocked'));
             remoteVideo.innerHTML = '';
         }
     };
@@ -1504,11 +1522,26 @@ function showActiveCallModal(isOutgoing) {
         locationText.textContent = 'Position non disponible';
     }
 
-    if (isVideoCall && localStream) {
-        document.getElementById('local-video').srcObject = localStream;
-    } else if (!isVideoCall && localStream) {
+    if (localStream) {
+        const localVideo = document.getElementById('local-video');
+        if (localVideo) {
+            localVideo.srcObject = localStream;
+            localVideo.muted = true;
+            localVideo.playsInline = true;
+        }
+    }
+
+    if (isVideoCall) {
         const remoteVideo = document.getElementById('remote-video');
-        remoteVideo.innerHTML = '<div class="audio-only-avatar"><i class="fas fa-user-circle"></i></div>';
+        if (remoteVideo) {
+            remoteVideo.muted = false;
+        }
+    } else {
+        const remoteVideo = document.getElementById('remote-video');
+        if (remoteVideo) {
+            remoteVideo.srcObject = null;
+            remoteVideo.innerHTML = '<div class="audio-only-avatar"><i class="fas fa-user-circle"></i></div>';
+        }
     }
 }
 
@@ -1598,8 +1631,12 @@ async function startOutgoingCall() {
         }
 
         localStream = await navigator.mediaDevices.getUserMedia({
-            audio: true,
-            video: isVideoCall
+            audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true
+            },
+            video: isVideoCall ? { facingMode: 'user' } : false
         });
 
         callSession.callId = createCallId();
@@ -1647,7 +1684,12 @@ async function startOutgoingCall() {
         showToast(`${isVideoCall ? 'Appel video' : 'Appel vocal'} en cours...`, 'info');
 
         if (isVideoCall && localStream) {
-            document.getElementById('local-video').srcObject = localStream;
+            const localVideo = document.getElementById('local-video');
+            if (localVideo) {
+                localVideo.srcObject = localStream;
+                localVideo.muted = true;
+                localVideo.play().catch(() => {});
+            }
         }
 
     } catch (error) {

@@ -617,17 +617,36 @@ function stopRingtone() {
     }
 }
 
-const ICE_SERVERS_ADMIN = {
+let ICE_SERVERS_ADMIN = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
         { urls: 'stun:stun2.l.google.com:19302' },
         { urls: 'stun:stun3.l.google.com:19302' },
         { urls: 'stun:stun4.l.google.com:19302' },
-        { urls: 'stun:openrelay.metered.ca:80' },
         { urls: 'stun:global.stun.twilio.com:3478' }
     ]
 };
+
+async function loadWebrtcConfigAdmin() {
+    try {
+        const response = await fetch(`${API_URL}/api/config/webrtc`, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' }
+        });
+
+        if (!response.ok) {
+            return;
+        }
+
+        const data = await response.json();
+        if (data && Array.isArray(data.iceServers) && data.iceServers.length > 0) {
+            ICE_SERVERS_ADMIN = { iceServers: data.iceServers };
+        }
+    } catch (error) {
+        console.warn('WebRTC config unavailable in admin, using default STUN only:', error);
+    }
+}
 
 function createPeerConnectionAdmin() {
     if (!adminCallState.peerConnection) {
@@ -648,6 +667,8 @@ function createPeerConnectionAdmin() {
             const remoteVideo = document.getElementById('remote-video');
             if (remoteVideo && event.streams[0]) {
                 remoteVideo.srcObject = event.streams[0];
+                remoteVideo.muted = false;
+                remoteVideo.play().catch(() => console.log('Autoplay remote video blocked'));
                 remoteVideo.innerHTML = '';
             }
         };
@@ -826,12 +847,21 @@ document.getElementById('btn-answer-call').addEventListener('click', async () =>
         }
 
         adminCallState.localStream = await navigator.mediaDevices.getUserMedia({
-            audio: true,
-            video: adminCallState.incomingCall.type === 'video'
+            audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true
+            },
+            video: adminCallState.incomingCall.type === 'video' ? { facingMode: 'user' } : false
         });
         
         if (adminCallState.incomingCall.type === 'video') {
-            document.getElementById('local-video').srcObject = adminCallState.localStream;
+            const localVideo = document.getElementById('local-video');
+            if (localVideo) {
+                localVideo.srcObject = adminCallState.localStream;
+                localVideo.muted = true;
+                localVideo.play().catch(() => {});
+            }
         }
         
         // Create peer connection for both audio and video calls
