@@ -28,6 +28,15 @@ let selectedEmergencyType = null;
 let tempToken = null;
 let socket = null;
 let activeCall = null;
+let callSession = {
+    callId: null,
+    type: 'audio',
+    status: 'idle'
+};
+
+function createCallId() {
+    return `call-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+}
 
 // Goma neighborhoods with approximate centers
 const GOMA_QUARTIERS = [
@@ -1506,6 +1515,9 @@ function showActiveCallModal(isOutgoing) {
 // Incoming call handler
 function handleIncomingCall(data) {
     currentCallData = data;
+    callSession.callId = data.callId || callSession.callId || currentUser?.id + '-' + Date.now();
+    callSession.type = data.type || 'audio';
+    callSession.status = 'ringing';
     document.getElementById('incoming-call-modal').classList.remove('hidden');
     document.getElementById('incoming-call-user').textContent = data.callerName || 'Centre de securite';
     document.getElementById('incoming-call-type').innerHTML = 
@@ -1525,8 +1537,8 @@ function handleIncomingCall(data) {
 
 // Reject call
 function rejectCall() {
-    if (currentCallData) {
-        socket.emit('reject-call', { callerId: currentCallData.callerId });
+    if (currentCallData && socket && socket.connected) {
+        socket.emit('reject-call', { callId: currentCallData.callId || callSession.callId, callerId: currentCallData.callerId });
     }
     if (peerConnection) {
         peerConnection.close();
@@ -1534,6 +1546,7 @@ function rejectCall() {
     }
     currentCallData = null;
     activeCall = null;
+    callSession = { callId: null, type: 'audio', status: 'idle' };
     stopRingtone();
     document.getElementById('incoming-call-modal').classList.add('hidden');
 }
@@ -1550,10 +1563,17 @@ function endCall() {
         peerConnection = null;
     }
 
+    if (socket && socket.connected && (currentCallData || callSession.callId)) {
+        socket.emit('end-call', { callId: currentCallData?.callId || callSession.callId, callerId: currentCallData?.callerId || currentUser?.id });
+    }
+
     document.getElementById('active-call-modal').classList.add('hidden');
     document.getElementById('incoming-call-modal').classList.add('hidden');
     document.getElementById('local-video').srcObject = null;
     document.getElementById('remote-video').srcObject = null;
+    currentCallData = null;
+    activeCall = null;
+    callSession = { callId: null, type: 'audio', status: 'idle' };
     stopRingtone();
 }
 
@@ -1582,6 +1602,10 @@ async function startOutgoingCall() {
             video: isVideoCall
         });
 
+        callSession.callId = createCallId();
+        callSession.type = isVideoCall ? 'video' : 'audio';
+        callSession.status = 'calling';
+
         showActiveCallModal(true);
         
         createPeerConnection();
@@ -1601,7 +1625,8 @@ async function startOutgoingCall() {
             sdp: peerConnection.localDescription
         };
 
-        socket.emit('citizen-call', {
+        const payload = {
+            callId: callSession.callId,
             callerId: currentUser.id,
             callerName: `${currentUser.nom} ${currentUser.prenom}`,
             callerRole: currentUser.role,
@@ -1609,13 +1634,15 @@ async function startOutgoingCall() {
             longitude: currentPosition?.lng || null,
             quartier: currentQuartier || null,
             avenue: currentAvenue || null,
-            type: isVideoCall ? 'video' : 'audio',
+            type: callSession.type,
             timestamp: new Date().toISOString(),
             webrtcOffer: webrtcOfferData
-        });
+        };
+
+        socket.emit('citizen-call', payload);
         
-        currentCallData = { callerId: currentUser.id, callerName: `${currentUser.nom} ${currentUser.prenom}` };
-        activeCall = { type: 'outgoing', stream: localStream };
+        currentCallData = { ...payload, callId: callSession.callId };
+        activeCall = { type: 'outgoing', stream: localStream, callId: callSession.callId };
 
         showToast(`${isVideoCall ? 'Appel video' : 'Appel vocal'} en cours...`, 'info');
 
@@ -1745,6 +1772,48 @@ function initDraggableVideo() {
 
 // =====================
 // SOCKET.IO
+// =====================
+
+function initCallSocket() {
+    if (!socket) return;
+    socket.on('call-rejected', () => {
+        endCall();
+        showToast('Appel rejete', 'info');
+    });
+
+    socket.on('call-ended', () => {
+        endCall();
+        showToast('Appel termine', 'info');
+    });
+
+    socket.on('admin-incoming-call', (data) => {
+        currentCallData = { ...data, callerId: data.callerId || currentUser?.id };
+        callSession.callId = data.callId || callSession.callId;
+        showToast('Le centre de securite a accepte l\'appel', 'success');
+    });
+
+    socket.on('webrtc-answer', async (data) => {
+        if (!peerConnection || !data || !data.sdp) return;
+        try {
+            if (data.callId && currentCallData && data.callId !== currentCallData.callId) return;
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
+            callSession.status = 'connected';
+        } catch (error) {
+            console.error('Error setting remote description from answer:', error);
+        }
+    });
+
+    socket.on('webrtc-ice-candidate', async (data) => {
+        if (!peerConnection || !data || !data.candidate) return;
+        try {
+            if (data.callId && currentCallData && data.callId !== currentCallData.callId) return;
+            await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+        } catch (error) {
+            console.error('Error adding ICE candidate (citizen):', error);
+        }
+    });
+}
+
 // =====================
 // INITIALIZE
 // =====================

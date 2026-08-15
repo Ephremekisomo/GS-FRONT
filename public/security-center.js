@@ -551,7 +551,8 @@ let adminCallState = {
     incomingCall: null,
     peerConnection: null,
     localStream: null,
-    pendingOffer: null
+    pendingOffer: null,
+    callId: null
 };
 
 let ringtoneAudioContext = null;
@@ -697,11 +698,17 @@ async function handlePendingOffer() {
     
     const pc = adminCallState.peerConnection;
     try {
+        if (pc.signalingState !== 'stable') {
+            console.log('Skipping offer processing because signaling is not stable:', pc.signalingState);
+            return;
+        }
+
         await pc.setRemoteDescription(new RTCSessionDescription(adminCallState.pendingOffer.sdp));
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
         const targetCallerId = adminCallState.pendingOffer.callerId || adminCallState.incomingCall?.callerId;
         socket.emit('webrtc-answer', {
+            callId: adminCallState.callId || adminCallState.pendingOffer.callId || targetCallerId,
             callerId: targetCallerId,
             calleeId: currentUser.id,
             sdp: pc.localDescription
@@ -735,6 +742,7 @@ async function handlePendingOffer() {
 
 function showIncomingCallModal(data) {
     adminCallState.incomingCall = data;
+    adminCallState.callId = data.callId || adminCallState.callId;
     document.getElementById('incoming-call-modal').classList.remove('hidden');
     document.getElementById('incoming-call-user').textContent = data.callerName || 'Citoyen';
     document.getElementById('incoming-call-type').innerHTML = 
@@ -838,6 +846,7 @@ document.getElementById('btn-answer-call').addEventListener('click', async () =>
         }
         
         socket.emit('admin-answer-call', {
+            callId: adminCallState.callId || adminCallState.incomingCall.callId || adminCallState.incomingCall.callerId,
             callerId: adminCallState.incomingCall.callerId,
             adminId: currentUser.id,
             adminName: `${currentUser.nom} ${currentUser.prenom}`
@@ -902,6 +911,8 @@ function adminEndCall() {
     document.getElementById('local-video').srcObject = null;
     document.getElementById('remote-video').srcObject = null;
     adminCallState.incomingCall = null;
+    adminCallState.pendingOffer = null;
+    adminCallState.callId = null;
 }
 
 function rejectCall() {
@@ -1003,6 +1014,7 @@ function initSocket() {
     // Listen for citizen calls
     socket.on('citizen-call', (data) => {
         console.log('Citizen call received:', data);
+        adminCallState.callId = data.callId || adminCallState.callId;
         showIncomingCallModal(data);
     });
 
@@ -1025,25 +1037,26 @@ function initSocket() {
     // WebRTC signaling for calls (audio + video)
     socket.on('webrtc-offer', async (data) => {
         console.log('WebRTC offer received:', data);
-        // Store offer regardless of call state to handle race conditions
-        if (!adminCallState.pendingOffer || adminCallState.pendingOffer.callerId !== data.callerId) {
+        adminCallState.callId = data.callId || adminCallState.callId;
+        if (!adminCallState.pendingOffer || adminCallState.pendingOffer.callerId !== data.callerId || adminCallState.pendingOffer.callId !== data.callId) {
             adminCallState.pendingOffer = data;
         }
-        // If we have an active incoming call and peer connection, handle immediately
         if (adminCallState.incomingCall && adminCallState.peerConnection) {
             await handlePendingOffer();
         }
     });
     
     socket.on('webrtc-answer', async (data) => {
-        if (adminCallState.peerConnection && adminCallState.peerConnection.signalingState === 'have-local-offer') {
-            await adminCallState.peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
-            console.log('Remote description set from answer (admin)');
+        if (adminCallState.peerConnection && data.callId === adminCallState.callId) {
+            if (adminCallState.peerConnection.signalingState === 'have-local-offer' || adminCallState.peerConnection.signalingState === 'have-remote-offer') {
+                await adminCallState.peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
+                console.log('Remote description set from answer (admin)');
+            }
         }
     });
     
     socket.on('webrtc-ice-candidate', async (data) => {
-        if (adminCallState.peerConnection && data.candidate) {
+        if (adminCallState.peerConnection && data.candidate && data.callId === adminCallState.callId) {
             try {
                 await adminCallState.peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
             } catch (e) {
