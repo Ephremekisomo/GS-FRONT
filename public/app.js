@@ -1465,13 +1465,7 @@ function createPeerConnection() {
     
     peerConnection.ontrack = (event) => {
         console.log('Remote track received:', event);
-        const remoteVideo = document.getElementById('remote-video');
-        if (remoteVideo && event.streams[0]) {
-            remoteVideo.srcObject = event.streams[0];
-            remoteVideo.muted = false;
-            remoteVideo.play().catch(() => console.log('Autoplay remote video blocked'));
-            remoteVideo.innerHTML = '';
-        }
+        attachRemoteMediaStream(event.streams[0]);
     };
     
     peerConnection.oniceconnectionstatechange = () => {
@@ -1500,6 +1494,28 @@ function createPeerConnection() {
     }
     
     return peerConnection;
+}
+
+function attachRemoteMediaStream(stream) {
+    remoteStream = stream;
+
+    const remoteVideo = document.getElementById('remote-video');
+    const remoteAudio = document.getElementById('remote-audio');
+
+    if (remoteVideo && stream) {
+        remoteVideo.srcObject = stream;
+        remoteVideo.muted = false;
+        remoteVideo.volume = 1;
+        remoteVideo.style.display = isVideoCall ? 'block' : 'none';
+        remoteVideo.play().catch(() => console.log('Autoplay remote video blocked'));
+    }
+
+    if (remoteAudio && stream) {
+        remoteAudio.srcObject = stream;
+        remoteAudio.muted = false;
+        remoteAudio.volume = 1;
+        remoteAudio.play().catch(() => console.log('Autoplay remote audio blocked'));
+    }
 }
 
 // Show active call modal
@@ -1531,17 +1547,15 @@ function showActiveCallModal(isOutgoing) {
         }
     }
 
-    if (isVideoCall) {
-        const remoteVideo = document.getElementById('remote-video');
-        if (remoteVideo) {
-            remoteVideo.muted = false;
-        }
-    } else {
-        const remoteVideo = document.getElementById('remote-video');
-        if (remoteVideo) {
-            remoteVideo.srcObject = null;
-            remoteVideo.innerHTML = '<div class="audio-only-avatar"><i class="fas fa-user-circle"></i></div>';
-        }
+    const remoteVideo = document.getElementById('remote-video');
+    if (remoteVideo) {
+        remoteVideo.style.display = isVideoCall ? 'block' : 'none';
+        remoteVideo.muted = false;
+    }
+
+    const remoteAudio = document.getElementById('remote-audio');
+    if (remoteAudio) {
+        remoteAudio.style.display = isVideoCall ? 'none' : 'block';
     }
 }
 

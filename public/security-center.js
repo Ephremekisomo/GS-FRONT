@@ -664,13 +664,7 @@ function createPeerConnectionAdmin() {
         
         adminCallState.peerConnection.ontrack = (event) => {
             console.log('Remote track received:', event);
-            const remoteVideo = document.getElementById('remote-video');
-            if (remoteVideo && event.streams[0]) {
-                remoteVideo.srcObject = event.streams[0];
-                remoteVideo.muted = false;
-                remoteVideo.play().catch(() => console.log('Autoplay remote video blocked'));
-                remoteVideo.innerHTML = '';
-            }
+            attachRemoteMediaStreamAdmin(event.streams[0]);
         };
         
         adminCallState.peerConnection.oniceconnectionstatechange = () => {
@@ -699,6 +693,26 @@ function createPeerConnectionAdmin() {
     }
     
     return adminCallState.peerConnection;
+}
+
+function attachRemoteMediaStreamAdmin(stream) {
+    const remoteVideo = document.getElementById('remote-video');
+    const remoteAudio = document.getElementById('remote-audio');
+
+    if (remoteVideo && stream) {
+        remoteVideo.srcObject = stream;
+        remoteVideo.muted = false;
+        remoteVideo.volume = 1;
+        remoteVideo.style.display = (adminCallState.incomingCall && adminCallState.incomingCall.type === 'video') ? 'block' : 'none';
+        remoteVideo.play().catch(() => console.log('Autoplay remote video blocked'));
+    }
+
+    if (remoteAudio && stream) {
+        remoteAudio.srcObject = stream;
+        remoteAudio.muted = false;
+        remoteAudio.volume = 1;
+        remoteAudio.play().catch(() => console.log('Autoplay remote audio blocked'));
+    }
 }
 
 // =====================
@@ -792,6 +806,16 @@ function showActiveCallModal() {
         modal.classList.add('audio-only');
     } else {
         modal.classList.remove('audio-only');
+    }
+
+    const remoteVideo = document.getElementById('remote-video');
+    if (remoteVideo) {
+        remoteVideo.style.display = (adminCallState.incomingCall && adminCallState.incomingCall.type === 'video') ? 'block' : 'none';
+    }
+
+    const remoteAudio = document.getElementById('remote-audio');
+    if (remoteAudio) {
+        remoteAudio.style.display = (adminCallState.incomingCall && adminCallState.incomingCall.type === 'video') ? 'none' : 'block';
     }
     
     const locationText = document.getElementById('call-location-text');
