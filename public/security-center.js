@@ -106,29 +106,8 @@ async function loadCurrentUser() {
 // MAP
 // =====================
 
-// Fonds de carte disponibles (aucune cle API requise)
+// Fonds de carte : OpenStreetMap uniquement (aucune cle API requise)
 const BASEMAPS = {
-    dark: {
-        nom: 'Nuit',
-        url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-        subdomains: 'abcd',
-        maxZoom: 20
-    },
-    light: {
-        nom: 'Jour',
-        url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-        subdomains: 'abcd',
-        maxZoom: 20
-    },
-    streets: {
-        nom: 'Routes',
-        url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-        subdomains: 'abcd',
-        maxZoom: 20
-    },
     osm: {
         nom: 'OpenStreetMap',
         url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
@@ -180,7 +159,6 @@ function probeBasemap(key) {
 }
 
 let mapBaseLayer = null;
-let basemapStyle = localStorage.getItem('sc_basemap') || 'dark';
 
 // Cree un fond de carte avec repli automatique en cas d'echec
 function createBaseLayer(instance, styleNames, onChange) {
@@ -311,26 +289,6 @@ function addMapControls(instance) {
     };
     fsControl.addTo(instance);
 
-    // Cycle des fonds de carte (le choix est memorise)
-    const styleControl = L.control({ position: 'topright' });
-    styleControl.onAdd = function() {
-        const btn = L.DomUtil.create('button', 'sc-map-control');
-        btn.type = 'button';
-        const icons = { dark: 'fa-moon', light: 'fa-sun', streets: 'fa-map', osm: 'fa-globe' };
-        const paint = (key) => {
-            btn.innerHTML = `<i class="fas ${icons[key] || 'fa-map'}"></i>`;
-            btn.title = `Fond: ${(BASEMAPS[key] || {}).nom || key}`;
-        };
-        paint(mapBaseLayer ? mapBaseLayer.current : basemapStyle);
-        L.DomEvent.on(btn, 'click', (e) => {
-            L.DomEvent.stop(e);
-            if (!mapBaseLayer) return;
-            paint(mapBaseLayer.cycle());
-        });
-        return btn;
-    };
-    styleControl.addTo(instance);
-
     L.control.scale({ position: 'bottomleft', imperial: false, maxWidth: 120 }).addTo(instance);
 }
 
@@ -357,13 +315,7 @@ function initMap() {
         fadeAnimation: true
     }).setView([DEFAULT_LAT, DEFAULT_LNG], 12);
 
-    const preferred = BASEMAPS[basemapStyle] ? basemapStyle : 'dark';
-    const order = [preferred, 'dark', 'light', 'osm'].filter((v, i, a) => a.indexOf(v) === i);
-
-    mapBaseLayer = createBaseLayer(map, order, (key) => {
-        basemapStyle = key;
-        localStorage.setItem('sc_basemap', key);
-    });
+    mapBaseLayer = createBaseLayer(map, ['osm']);
 
     addMapControls(map);
     addLegend(map);

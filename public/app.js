@@ -544,22 +544,8 @@ function renderEmergencyTypes() {
 // MAP
 // =====================
 
-// Fonds de carte disponibles (aucune cle API requise)
+// Fond de carte : OpenStreetMap uniquement (aucune cle API requise)
 const BASEMAPS = {
-    light: {
-        nom: 'Positron',
-        url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-        subdomains: 'abcd',
-        maxZoom: 20
-    },
-    streets: {
-        nom: 'Routes',
-        url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-        subdomains: 'abcd',
-        maxZoom: 20
-    },
     osm: {
         nom: 'OpenStreetMap',
         url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
@@ -751,27 +737,6 @@ function addMapControls(instance) {
     };
     fsControl.addTo(instance);
 
-    // Fond de carte : cycle Positron -> Routes -> OpenStreetMap
-    const styleControl = L.control({ position: 'topright' });
-    styleControl.onAdd = function() {
-        const btn = L.DomUtil.create('button', 'map-control-btn');
-        btn.type = 'button';
-        const icons = { light: 'fa-satellite', streets: 'fa-map', osm: 'fa-globe' };
-        const paint = (key) => {
-            btn.innerHTML = `<i class="fas ${icons[key] || 'fa-map'}"></i>`;
-            btn.title = `Fond: ${(BASEMAPS[key] || {}).nom || key}`;
-        };
-        paint(mapBaseLayer ? mapBaseLayer.current : 'light');
-        L.DomEvent.on(btn, 'click', (e) => {
-            L.DomEvent.stop(e);
-            if (!mapBaseLayer) return;
-            const key = mapBaseLayer.cycle();
-            paint(key);
-        });
-        return btn;
-    };
-    styleControl.addTo(instance);
-
     // Echelle
     L.control.scale({ position: 'bottomleft', imperial: false, maxWidth: 120 }).addTo(instance);
 
@@ -831,12 +796,6 @@ function addCityBadge(instance, city) {
 let mapBaseLayer = null;
 let initialViewDone = false;
 
-// Fond de carte retenu par l'utilisateur (survit aux rechargements)
-function getPreferredBasemap() {
-    const saved = localStorage.getItem('citizen_basemap');
-    return BASEMAPS[saved] ? saved : 'light';
-}
-
 function initMap() {
     const city = CITIES[currentCity] || CITIES[DEFAULT_CITY];
 
@@ -853,13 +812,7 @@ function initMap() {
     map.on('mouseout', () => map.scrollWheelZoom.disable());
     map.on('focus', () => map.scrollWheelZoom.enable());
 
-    const preferred = getPreferredBasemap();
-    // Le fond choisi passe en tete, les autres restent disponibles en repli
-    const order = [preferred, 'light', 'streets', 'osm'].filter((v, i, a) => a.indexOf(v) === i);
-
-    mapBaseLayer = createBaseLayer(map, order, (key) => {
-        localStorage.setItem('citizen_basemap', key);
-    });
+    mapBaseLayer = createBaseLayer(map, ['osm']);
 
     addMapControls(map);
     addServiceArea(map, city);

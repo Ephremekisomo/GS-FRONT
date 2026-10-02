@@ -3,7 +3,7 @@
  * PWA Service Worker for offline support
  */
 
-const CACHE_NAME = 'goma-security-v2';
+const CACHE_NAME = 'goma-security-v3';
 const STATIC_ASSETS = [
     '/',
     '/index.html',
