@@ -1828,7 +1828,7 @@ document.getElementById('export-pdf').addEventListener('click', () => {
     doc.setFillColor(...primaryColor);
     doc.rect(0, 0, 300, 35, 'F');
     
-    // Logo icon (shield with GS text)
+    // Logo icon (shield with 404 text)
     doc.setFillColor(...accentColor);
     // Shield shape
     doc.moveTo(15, 8);
@@ -1838,11 +1838,11 @@ document.getElementById('export-pdf').addEventListener('click', () => {
     doc.lineTo(15, 22);
     doc.lineTo(15, 8);
     doc.fill();
-    // GS text inside shield
+    // 404 text inside shield
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(10);
+    doc.setFontSize(8);
     doc.setFont(undefined, 'bold');
-    doc.text('GS', 21, 18);
+    doc.text('404', 25, 20, { align: 'center' });
     
     // Title
     doc.setFontSize(22);

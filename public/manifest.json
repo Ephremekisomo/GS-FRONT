@@ -1,7 +1,7 @@
 {
-    "name": "Goma Security",
-    "short_name": "GomaSec",
-    "description": "Application de securite urbaine pour la ville de Goma, RDC",
+    "name": "404Signalisation",
+    "short_name": "404Sign",
+    "description": "Application de securite urbaine pour Goma et Kinshasa, RDC",
     "start_url": "/",
     "display": "standalone",
     "background_color": "#1a1a2e",

@@ -143,7 +143,7 @@ self.addEventListener('push', (event) => {
     
     event.waitUntil(
         self.registration.showNotification(
-            data.title || 'Goma Security',
+            data.title || '404Signalisation',
             options
         )
     );
