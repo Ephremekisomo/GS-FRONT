@@ -99,6 +99,7 @@ let DEFAULT_LNG = CITIES[DEFAULT_CITY].lng;
 let currentUser = null;
 let map = null;
 let userMarker = null;
+let userAccuracyCircle = null;
 let currentPosition = null;
 let currentQuartier = null;
 let currentAvenue = null;
@@ -543,44 +544,224 @@ function renderEmergencyTypes() {
 // MAP
 // =====================
 
-function initMap() {
-    map = L.map('map').setView([DEFAULT_LAT, DEFAULT_LNG], 13);
-    
-    // Primary: CartoDB Voyager tiles (no API key required)
-    const cartoLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+// Fonds de carte disponibles (aucune cle API requise)
+const BASEMAPS = {
+    light: {
+        url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
         subdomains: 'abcd',
         maxZoom: 20
-    });
-    
-    // Fallback: OpenStreetMap standard tiles
-    const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    },
+    streets: {
+        url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+        subdomains: 'abcd',
+        maxZoom: 20
+    },
+    osm: {
+        url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        subdomains: 'abc',
         maxZoom: 19
-    });
-    
-    cartoLayer.addTo(map);
-    
-    // Fallback if CartoDB fails
-    cartoLayer.on('tileerror', function() {
-        console.warn('CartoDB tiles failed, falling back to OpenStreetMap');
-        map.removeLayer(cartoLayer);
-        osmLayer.addTo(map);
-    });
-    
-    // Add Google Maps button
-    const googleMapsBtn = L.control({position: 'bottomright'});
-    googleMapsBtn.onAdd = function() {
-        const div = L.DomUtil.create('div', 'google-maps-btn');
-        div.innerHTML = '<a href="https://www.google.com/maps" target="_blank"><i class="fab fa-google"></i> Google Maps</a>';
-        return div;
+    }
+};
+
+// Cree un fond de carte avec repli automatique en cas d'echec
+function createBaseLayer(instance, styleNames) {
+    const order = styleNames || ['light', 'streets', 'osm'];
+    let index = 0;
+    let layer = null;
+    let failed = false;
+
+    const loadNext = () => {
+        if (failed || index >= order.length) return;
+        if (layer) instance.removeLayer(layer);
+
+        const config = BASEMAPS[order[index++]];
+        layer = L.tileLayer(config.url, {
+            attribution: config.attribution,
+            subdomains: config.subdomains,
+            maxZoom: config.maxZoom,
+            detectRetina: true
+        });
+
+        let errors = 0;
+        layer.on('tileerror', () => {
+            errors++;
+            if (errors >= 4 && !failed) loadNext();
+        });
+
+        layer.addTo(instance);
     };
-    googleMapsBtn.addTo(map);
-    
-    // Add Goma marker
-    L.marker([DEFAULT_LAT, DEFAULT_LNG])
-        .addTo(map)
-        .bindPopup('Goma, RDC');
+
+    loadNext();
+    return {
+        get layer() { return layer; },
+        setStyle(name) {
+            if (order.includes(name)) {
+                order.splice(order.indexOf(name), 1);
+                order.unshift(name);
+                index = 0;
+                loadNext();
+            }
+        }
+    };
+}
+
+// Ajoute les controles de la carte
+function addMapControls(instance) {
+    // Zoom
+    L.control.zoom({ position: 'topright' }).addTo(instance);
+
+    // Ma position
+    const locateControl = L.control({ position: 'topright' });
+    locateControl.onAdd = function() {
+        const btn = L.DomUtil.create('button', 'map-control-btn');
+        btn.type = 'button';
+        btn.title = 'Centrer sur ma position';
+        btn.innerHTML = '<i class="fas fa-location-crosshairs"></i>';
+        L.DomEvent.on(btn, 'click', (e) => {
+            L.DomEvent.stop(e);
+            if (currentPosition) {
+                instance.setView([currentPosition.lat, currentPosition.lng], 16, { animate: true });
+            } else {
+                getHighAccuracyLocation()
+                    .then(loc => instance.setView([loc.lat, loc.lng], 16, { animate: true }))
+                    .catch(err => showToast(err.message, 'warning'));
+            }
+        });
+        return btn;
+    };
+    locateControl.addTo(instance);
+
+    // Plein ecran
+    const fsControl = L.control({ position: 'topright' });
+    fsControl.onAdd = function() {
+        const btn = L.DomUtil.create('button', 'map-control-btn');
+        btn.type = 'button';
+        btn.title = 'Plein ecran';
+        btn.innerHTML = '<i class="fas fa-expand"></i>';
+        L.DomEvent.on(btn, 'click', (e) => {
+            L.DomEvent.stop(e);
+            const el = instance.getContainer();
+            if (document.fullscreenElement) {
+                document.exitFullscreen();
+            } else if (el.requestFullscreen) {
+                el.requestFullscreen();
+            }
+        });
+        return btn;
+    };
+    fsControl.addTo(instance);
+
+    // Fond de carte
+    const styleControl = L.control({ position: 'topright' });
+    styleControl.onAdd = function() {
+        const btn = L.DomUtil.create('button', 'map-control-btn');
+        btn.type = 'button';
+        let nextStyle = 'streets';
+        const icons = { light: 'fa-satellite', streets: 'fa-map' };
+        const paint = () => {
+            btn.innerHTML = `<i class="fas ${icons[nextStyle]}"></i>`;
+            btn.title = nextStyle === 'streets' ? 'Vue routes' : 'Vue urbaine';
+        };
+        paint();
+        L.DomEvent.on(btn, 'click', (e) => {
+            L.DomEvent.stop(e);
+            if (mapBaseLayer) mapBaseLayer.setStyle(nextStyle);
+            nextStyle = nextStyle === 'streets' ? 'light' : 'streets';
+            paint();
+        });
+        return btn;
+    };
+    styleControl.addTo(instance);
+
+    // Echelle
+    L.control.scale({ position: 'bottomleft', imperial: false, maxWidth: 120 }).addTo(instance);
+
+    // Ouvrir dans Google Maps
+    const gmapsControl = L.control({ position: 'bottomright' });
+    gmapsControl.onAdd = function() {
+        const btn = L.DomUtil.create('button', 'map-control-btn map-control-wide');
+        btn.type = 'button';
+        btn.title = 'Ouvrir dans Google Maps';
+        btn.innerHTML = '<i class="fab fa-google"></i><span>Google Maps</span>';
+        L.DomEvent.on(btn, 'click', (e) => {
+            L.DomEvent.stop(e);
+            const lat = currentPosition ? currentPosition.lat : DEFAULT_LAT;
+            const lng = currentPosition ? currentPosition.lng : DEFAULT_LNG;
+            window.open(`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`, '_blank');
+        });
+        return btn;
+    };
+    gmapsControl.addTo(instance);
+}
+
+// Dessine la zone de service couverte par la ville
+function addServiceArea(instance, city) {
+    const center = L.latLng(city.lat, city.lng);
+    const radius = instance.distance(center, L.latLng(city.maxLat, city.lng));
+
+    L.circle(center, {
+        radius: radius,
+        stroke: true,
+        color: '#3498db',
+        weight: 1.5,
+        opacity: 0.45,
+        dashArray: '6 6',
+        fillColor: '#3498db',
+        fillOpacity: 0.05,
+        interactive: false
+    }).addTo(instance);
+
+    L.marker(center, {
+        icon: L.divIcon({
+            className: 'city-marker',
+            html: `<span class="city-marker-pin"><i class="fas fa-city"></i></span><span class="city-marker-label">${city.nom}, RDC</span>`,
+            iconSize: [0, 0]
+        }),
+        interactive: false,
+        keyboard: false
+    }).addTo(instance);
+}
+
+// Bandeau affichant la ville sur la carte
+function addCityBadge(instance, city) {
+    const badge = L.DomUtil.create('div', 'map-city-badge');
+    badge.innerHTML = `<i class="fas fa-city"></i><span>${city.nom}</span>`;
+    instance.getContainer().appendChild(badge);
+}
+
+let mapBaseLayer = null;
+let initialViewDone = false;
+
+function initMap() {
+    const city = CITIES[currentCity] || CITIES[DEFAULT_CITY];
+
+    map = L.map('map', {
+        zoomControl: false,
+        scrollWheelZoom: false,
+        zoomAnimation: true,
+        fadeAnimation: true,
+        markerZoomAnimation: true
+    }).setView([city.lat, city.lng], 13);
+
+    // La molette ne zoome que lorsque la carte est survolee ou activee
+    map.on('click', () => map.scrollWheelZoom.enable());
+    map.on('mouseout', () => map.scrollWheelZoom.disable());
+    map.on('focus', () => map.scrollWheelZoom.enable());
+
+    mapBaseLayer = createBaseLayer(map);
+    addMapControls(map);
+    addServiceArea(map, city);
+    addCityBadge(map, city);
+
+    // Corrige la taille si le conteneur etait masque au moment de l'init
+    setTimeout(() => {
+        if (map) map.invalidateSize();
+    }, 300);
+
+    initialViewDone = false;
 }
 
 function getUserLocation() {
@@ -595,20 +776,43 @@ function getUserLocation() {
                 
                 updateLocationDisplay();
                 
-                // Update or create marker
-                if (userMarker) {
-                    userMarker.setLatLng([currentPosition.lat, currentPosition.lng]);
-                } else {
-                    userMarker = L.marker([currentPosition.lat, currentPosition.lng], {
-                        icon: L.divIcon({
-                            className: 'user-marker',
-                            html: '<i class="fas fa-user-circle" style="color: #3498db; font-size: 24px;"></i>',
-                            iconSize: [30, 30]
-                        })
+                // Cercle de precision + marqueur de position
+                if (userAccuracyCircle) {
+                    userAccuracyCircle.setLatLng([currentPosition.lat, currentPosition.lng]);
+                    userAccuracyCircle.setRadius(currentPosition.accuracy);
+                } else if (map) {
+                    userAccuracyCircle = L.circle([currentPosition.lat, currentPosition.lng], {
+                        radius: currentPosition.accuracy,
+                        color: '#3498db',
+                        weight: 1,
+                        opacity: 0.5,
+                        fillColor: '#3498db',
+                        fillOpacity: 0.12,
+                        interactive: false
                     }).addTo(map);
                 }
                 
-                map.setView([currentPosition.lat, currentPosition.lng], 15);
+                if (userMarker) {
+                    userMarker.setLatLng([currentPosition.lat, currentPosition.lng]);
+                } else if (map) {
+                    userMarker = L.marker([currentPosition.lat, currentPosition.lng], {
+                        icon: L.divIcon({
+                            className: 'user-marker',
+                            html: '<span class="user-marker-halo"></span><span class="user-marker-dot"></span>',
+                            iconSize: [22, 22],
+                            iconAnchor: [11, 11]
+                        }),
+                        zIndexOffset: 1000,
+                        interactive: false,
+                        keyboard: false
+                    }).addTo(map);
+                }
+                
+                // Recentre une seule fois : ensuite l'utilisateur garde la main
+                if (map && !initialViewDone) {
+                    initialViewDone = true;
+                    map.setView([currentPosition.lat, currentPosition.lng], 15, { animate: false });
+                }
             },
             (error) => {
                 console.log('Geolocation error:', error);

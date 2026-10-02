@@ -3,7 +3,7 @@
  * PWA Service Worker for offline support
  */
 
-const CACHE_NAME = 'goma-security-v1';
+const CACHE_NAME = 'goma-security-v2';
 const STATIC_ASSETS = [
     '/',
     '/index.html',
@@ -95,46 +95,30 @@ self.addEventListener('fetch', (event) => {
         return;
     }
     
-    // For other requests, try cache first, then network
+    // For other requests, fetch from network first so updates are never stale
     event.respondWith(
-        caches.match(event.request)
-            .then((cachedResponse) => {
-                if (cachedResponse) {
-                    // Return cached response and update cache in background
-                    event.waitUntil(
-                        fetch(event.request)
-                            .then((networkResponse) => {
-                                if (networkResponse.ok) {
-                                    caches.open(CACHE_NAME)
-                                        .then((cache) => {
-                                            cache.put(event.request, networkResponse.clone());
-                                        });
-                                }
-                            })
-                            .catch(() => {})
-                    );
-                    
-                    return cachedResponse;
+        fetch(event.request)
+            .then((networkResponse) => {
+                if (networkResponse.ok) {
+                    const responseClone = networkResponse.clone();
+                    caches.open(CACHE_NAME)
+                        .then((cache) => {
+                            cache.put(event.request, responseClone);
+                        });
                 }
-                
-                // Not in cache, fetch from network
-                return fetch(event.request)
-                    .then((networkResponse) => {
-                        if (networkResponse.ok) {
-                            const responseClone = networkResponse.clone();
-                            caches.open(CACHE_NAME)
-                                .then((cache) => {
-                                    cache.put(event.request, responseClone);
-                                });
-                        }
-                        return networkResponse;
-                    })
-                    .catch(() => {
-                        // Return offline page for navigation requests
-                        if (event.request.mode === 'navigate') {
-                            return caches.match('/index.html');
-                        }
-                    });
+                return networkResponse;
+            })
+            .catch(() => {
+                // Hors ligne : servir depuis le cache
+                return caches.match(event.request).then((cachedResponse) => {
+                    if (cachedResponse) return cachedResponse;
+
+                    if (event.request.mode === 'navigate') {
+                        return caches.match('/index.html');
+                    }
+
+                    return new Response('', { status: 504, statusText: 'Offline' });
+                });
             })
     );
 });

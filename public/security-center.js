@@ -19,6 +19,7 @@ let currentUser = null;
 let socket = null;
 let map = null;
 let alertMarkers = {};
+let alertCircles = {};
 let alerts = [];
 let selectedAlert = null;
 let soundEnabled = true;
@@ -105,44 +106,191 @@ async function loadCurrentUser() {
 // MAP
 // =====================
 
-function initMap() {
-    map = L.map('map').setView([DEFAULT_LAT, DEFAULT_LNG], 12);
-    
-    // Primary: CartoDB Voyager tiles (no API key required)
-    const cartoLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+// Fonds de carte disponibles (aucune cle API requise)
+const BASEMAPS = {
+    dark: {
+        url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
         subdomains: 'abcd',
         maxZoom: 20
-    });
-    
-    // Fallback: OpenStreetMap standard tiles
-    const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    },
+    light: {
+        url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+        subdomains: 'abcd',
+        maxZoom: 20
+    },
+    streets: {
+        url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+        subdomains: 'abcd',
+        maxZoom: 20
+    },
+    osm: {
+        url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        subdomains: 'abc',
         maxZoom: 19
-    });
-    
-    cartoLayer.addTo(map);
-    
-    // Fallback if CartoDB fails
-    cartoLayer.on('tileerror', function() {
-        console.warn('CartoDB tiles failed, falling back to OpenStreetMap');
-        map.removeLayer(cartoLayer);
-        osmLayer.addTo(map);
-    });
-    
-    // Add Google Maps button
-    const googleMapsBtn = L.control({position: 'bottomright'});
-    googleMapsBtn.onAdd = function() {
-        const div = L.DomUtil.create('div', 'google-maps-btn');
-        div.innerHTML = '<a href="https://www.google.com/maps" target="_blank"><i class="fab fa-google"></i> Google Maps</a>';
+    }
+};
+
+let mapBaseLayer = null;
+let basemapStyle = localStorage.getItem('sc_basemap') || 'dark';
+
+// Cree un fond de carte avec repli automatique en cas d'echec
+function createBaseLayer(instance, styleNames) {
+    const order = styleNames || ['dark', 'light', 'streets', 'osm'];
+    let index = 0;
+    let layer = null;
+
+    const loadNext = () => {
+        if (index >= order.length) return;
+        if (layer) instance.removeLayer(layer);
+
+        const config = BASEMAPS[order[index++]];
+        layer = L.tileLayer(config.url, {
+            attribution: config.attribution,
+            subdomains: config.subdomains,
+            maxZoom: config.maxZoom,
+            detectRetina: true
+        });
+
+        let errors = 0;
+        layer.on('tileerror', () => {
+            errors++;
+            if (errors >= 4) loadNext();
+        });
+
+        layer.addTo(instance);
+    };
+
+    loadNext();
+    return {
+        get layer() { return layer; },
+        setStyle(name) {
+            if (order.includes(name)) {
+                order.splice(order.indexOf(name), 1);
+                order.unshift(name);
+                index = 0;
+                loadNext();
+            }
+        }
+    };
+}
+
+// Controles de la carte du centre de securite
+function addMapControls(instance) {
+    L.control.zoom({ position: 'topright' }).addTo(instance);
+
+    // Recentrer sur toutes les alertes
+    const fitControl = L.control({ position: 'topright' });
+    fitControl.onAdd = function() {
+        const btn = L.DomUtil.create('button', 'sc-map-control');
+        btn.type = 'button';
+        btn.title = 'Voir toutes les alertes';
+        btn.innerHTML = '<i class="fas fa-crosshairs"></i>';
+        L.DomEvent.on(btn, 'click', (e) => {
+            L.DomEvent.stop(e);
+            fitMapToAlerts();
+        });
+        return btn;
+    };
+    fitControl.addTo(instance);
+
+    // Plein ecran
+    const fsControl = L.control({ position: 'topright' });
+    fsControl.onAdd = function() {
+        const btn = L.DomUtil.create('button', 'sc-map-control');
+        btn.type = 'button';
+        btn.title = 'Plein ecran';
+        btn.innerHTML = '<i class="fas fa-expand"></i>';
+        L.DomEvent.on(btn, 'click', (e) => {
+            L.DomEvent.stop(e);
+            const el = instance.getContainer();
+            if (document.fullscreenElement) {
+                document.exitFullscreen();
+            } else if (el.requestFullscreen) {
+                el.requestFullscreen();
+            }
+        });
+        return btn;
+    };
+    fsControl.addTo(instance);
+
+    // Basemap jour / nuit
+    const styleControl = L.control({ position: 'topright' });
+    styleControl.onAdd = function() {
+        const btn = L.DomUtil.create('button', 'sc-map-control');
+        btn.type = 'button';
+        btn.title = 'Vue jour / nuit';
+        const paint = () => {
+            btn.innerHTML = basemapStyle === 'dark'
+                ? '<i class="fas fa-sun"></i>'
+                : '<i class="fas fa-moon"></i>';
+        };
+        paint();
+        L.DomEvent.on(btn, 'click', (e) => {
+            L.DomEvent.stop(e);
+            basemapStyle = basemapStyle === 'dark' ? 'light' : 'dark';
+            localStorage.setItem('sc_basemap', basemapStyle);
+            paint();
+            if (mapBaseLayer) mapBaseLayer.setStyle(basemapStyle);
+        });
+        return btn;
+    };
+    styleControl.addTo(instance);
+
+    L.control.scale({ position: 'bottomleft', imperial: false, maxWidth: 120 }).addTo(instance);
+}
+
+// Legende des statuts
+function addLegend(instance) {
+    const legend = L.control({ position: 'bottomright' });
+    legend.onAdd = function() {
+        const div = L.DomUtil.create('div', 'sc-map-legend');
+        div.innerHTML = `
+            <div class="sc-legend-title">Statuts</div>
+            <div class="sc-legend-row"><span class="sc-legend-dot" style="background:#e74c3c"></span>Active</div>
+            <div class="sc-legend-row"><span class="sc-legend-dot" style="background:#f39c12"></span>En cours</div>
+            <div class="sc-legend-row"><span class="sc-legend-dot" style="background:#27ae60"></span>Resolu</div>
+        `;
         return div;
     };
-    googleMapsBtn.addTo(map);
-    
-    // Add Goma reference marker
-    L.marker([DEFAULT_LAT, DEFAULT_LNG])
-        .addTo(map)
-        .bindPopup('<b>Goma, RDC</b><br>Centre-ville');
+    legend.addTo(instance);
+}
+
+function initMap() {
+    map = L.map('map', {
+        zoomControl: false,
+        zoomAnimation: true,
+        fadeAnimation: true
+    }).setView([DEFAULT_LAT, DEFAULT_LNG], 12);
+
+    mapBaseLayer = createBaseLayer(map, [basemapStyle, 'dark', 'light', 'streets', 'osm']);
+    addMapControls(map);
+    addLegend(map);
+
+    setTimeout(() => {
+        if (map) map.invalidateSize();
+    }, 300);
+}
+
+// Icone de marqueur professionnelle pour une alerte
+function createAlertIcon(alert, isSelected) {
+    const color = alert.couleur || '#e74c3c';
+    const isLive = alert.status === 'active' || alert.status === 'in_progress' || !alert.status;
+    const statusClass = alert.status || 'active';
+
+    return L.divIcon({
+        className: 'sc-alert-marker-wrap',
+        html: `<div class="sc-alert-marker status-${statusClass}${isLive ? ' is-live' : ''}${isSelected ? ' is-selected' : ''}" style="--marker-color:${color}">
+                   <i class="fas ${alert.icone || 'fa-exclamation-triangle'}"></i>
+                   <span class="sc-alert-priority">P${alert.priority}</span>
+               </div>`,
+        iconSize: [40, 50],
+        iconAnchor: [20, 48],
+        popupAnchor: [0, -46]
+    });
 }
 
 // =====================
@@ -265,21 +413,36 @@ function renderAlerts() {
 function updateMapMarkers(fitView = false) {
     // Remove existing markers
     Object.values(alertMarkers).forEach(marker => map.removeLayer(marker));
+    Object.values(alertCircles).forEach(circle => map.removeLayer(circle));
     alertMarkers = {};
+    alertCircles = {};
     
     alerts.forEach(alert => {
         if (alert.latitude && alert.longitude) {
-            const markerClass = alert.status ? `alert-marker status-${alert.status}` : 'alert-marker';
+            const isSelected = selectedAlert && selectedAlert.id === alert.id;
             const marker = L.marker([alert.latitude, alert.longitude], {
-                icon: L.divIcon({
-                    className: markerClass,
-                    html: `<i class="fas ${alert.icone}" style="background: ${alert.couleur}; color: white; padding: 8px; border-radius: 50%;"></i>`,
-                    iconSize: [30, 30]
-                })
+                icon: createAlertIcon(alert, isSelected),
+                riseOnHover: true,
+                zIndexOffset: isSelected ? 1000 : 0,
+                title: `${alert.type_nom} - ${alert.ville || ''}`
             }).addTo(map);
             
             marker.on('click', () => showAlertDetails(alert.id));
             alertMarkers[alert.id] = marker;
+            
+            // Cercle de precision si disponible
+            if (alert.accuracy) {
+                const circle = L.circle([alert.latitude, alert.longitude], {
+                    radius: parseFloat(alert.accuracy),
+                    color: alert.couleur || '#e74c3c',
+                    weight: 1,
+                    opacity: 0.35,
+                    fillColor: alert.couleur || '#e74c3c',
+                    fillOpacity: 0.08,
+                    interactive: false
+                }).addTo(map);
+                alertCircles[alert.id] = circle;
+            }
         }
     });
     
@@ -363,6 +526,20 @@ function showAlertDetails(alertId) {
     if (selectedAlert.latitude && selectedAlert.longitude) {
         map.setView([selectedAlert.latitude, selectedAlert.longitude], 15);
     }
+    
+    // Met en evidence le marqueur selectionne
+    refreshMarkerSelection();
+}
+
+// Met a jour l'icone des marqueurs pour mettre en evidence la selection
+function refreshMarkerSelection() {
+    alerts.forEach(alert => {
+        const marker = alertMarkers[alert.id];
+        if (!marker) return;
+        const isSelected = selectedAlert && selectedAlert.id === alert.id;
+        marker.setIcon(createAlertIcon(alert, isSelected));
+        marker.setZIndexOffset(isSelected ? 1000 : 0);
+    });
 }
 
 // Open Google Maps with directions
