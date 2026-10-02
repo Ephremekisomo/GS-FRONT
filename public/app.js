@@ -547,63 +547,160 @@ function renderEmergencyTypes() {
 // Fonds de carte disponibles (aucune cle API requise)
 const BASEMAPS = {
     light: {
+        nom: 'Positron',
         url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
         subdomains: 'abcd',
         maxZoom: 20
     },
     streets: {
+        nom: 'Routes',
         url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
         subdomains: 'abcd',
         maxZoom: 20
     },
     osm: {
-        url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        nom: 'OpenStreetMap',
+        url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-        subdomains: 'abc',
+        subdomains: '',
         maxZoom: 19
     }
 };
 
+// Tuile transparente : en cas d'echec, aucune image cassee ne s'affiche
+const TRANSPARENT_TILE = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+
+// Une vraie tuile fait 256x256. Les images d'erreur ("Api key required",
+// "missing key", ...) sont plus petites : on les detecte par leur taille.
+const MIN_TILE_SIZE = 200;
+
+function isValidTileImage(img) {
+    return !!img && img.complete && img.naturalWidth >= MIN_TILE_SIZE && img.naturalHeight >= MIN_TILE_SIZE;
+}
+
+// Verifie qu'un fond de carte livre de vraies tuiles avant de l'utiliser
+function probeBasemap(key) {
+    return new Promise((resolve) => {
+        const cfg = BASEMAPS[key];
+        if (!cfg) return resolve(false);
+
+        const sub = cfg.subdomains ? cfg.subdomains.charAt(0) : 'a';
+        const url = cfg.url
+            .replace('{s}', sub || 'a')
+            .replace('{z}', 12).replace('{x}', 2380).replace('{y}', 2066)
+            .replace('{r}', '')
+            .replace('{ratio}', '');
+
+        const img = new Image();
+        let done = false;
+        const finish = (ok) => {
+            if (done) return;
+            done = true;
+            clearTimeout(timer);
+            img.onload = null;
+            img.onerror = null;
+            resolve(ok);
+        };
+        const timer = setTimeout(() => finish(false), 9000);
+        img.onload = () => finish(isValidTileImage(img));
+        img.onerror = () => finish(false);
+        // Anti-cache : force une requete reseau
+        img.src = url + (url.indexOf('?') === -1 ? '?' : '&') + 'v=' + Date.now();
+    });
+}
+
 // Cree un fond de carte avec repli automatique en cas d'echec
-function createBaseLayer(instance, styleNames) {
-    const order = styleNames || ['light', 'streets', 'osm'];
-    let index = 0;
+function createBaseLayer(instance, styleNames, onChange) {
+    // Liste fixe des fonds : sert au cycle manuel
+    const allStyles = (styleNames || ['light', 'streets', 'osm']).slice();
+    // Chaine de repli automatique, reordonnee selon le fond actif
+    const order = allStyles.slice();
     let layer = null;
-    let failed = false;
+    let active = order[0];
+    let cycleIdx = 0;
+    let loadSeq = 0;
 
-    const loadNext = () => {
-        if (failed || index >= order.length) return;
+    const loadStyle = (key) => {
+        if (!BASEMAPS[key]) return;
+        const mySeq = ++loadSeq;
         if (layer) instance.removeLayer(layer);
+        active = key;
 
-        const config = BASEMAPS[order[index++]];
+        const config = BASEMAPS[key];
+        let errored = 0;
+        let invalid = 0;
+
         layer = L.tileLayer(config.url, {
             attribution: config.attribution,
             subdomains: config.subdomains,
             maxZoom: config.maxZoom,
-            detectRetina: true
+            detectRetina: true,
+            errorTileUrl: TRANSPARENT_TILE,
+            crossOrigin: true
         });
 
-        let errors = 0;
+        // Detection par contenu : une tuile trop petite n'est pas une vraie tuile
+        const fallbackTo = (reason) => {
+            if (mySeq !== loadSeq) return;
+            const next = order[order.indexOf(key) + 1];
+            if (next) {
+                console.warn(`Fond de carte "${config.nom}" inutilisable (${reason}), bascule sur "${BASEMAPS[next].nom}"`);
+                loadStyle(next);
+            }
+        };
+
         layer.on('tileerror', () => {
-            errors++;
-            if (errors >= 4 && !failed) loadNext();
+            errored++;
+            if (errored >= 3) fallbackTo('erreurs reseau');
+        });
+
+        layer.on('tileload', (e) => {
+            if (isValidTileImage(e.tile)) { errored = 0; invalid = 0; return; }
+            invalid++;
+            if (invalid >= 3) fallbackTo('images invalides');
         });
 
         layer.addTo(instance);
+        if (onChange) onChange(key);
+
+        // Pre-verification : si la source sert des images d'erreur, on change
+        probeBasemap(key).then((ok) => {
+            if (mySeq !== loadSeq) return;
+            if (!ok) fallbackTo('sonde invalide');
+        });
     };
 
-    loadNext();
+    loadStyle(order[0]);
+
+    const promote = (name) => {
+        const i = order.indexOf(name);
+        if (i === -1) return false;
+        order.splice(i, 1);
+        order.unshift(name);
+        return true;
+    };
+
     return {
         get layer() { return layer; },
-        setStyle(name) {
-            if (order.includes(name)) {
-                order.splice(order.indexOf(name), 1);
-                order.unshift(name);
-                index = 0;
-                loadNext();
-            }
+        get current() { return active; },
+        list() { return allStyles.slice(); },
+        // Passe a un fond precis et le place en tete de chaine
+        use(name) {
+            if (!promote(name)) return;
+            const i = allStyles.indexOf(name);
+            if (i !== -1) cycleIdx = i;
+            loadStyle(name);
+        },
+        // Passe au fond suivant : parcourt toute la liste
+        cycle() {
+            if (allStyles.length < 2) return active;
+            cycleIdx = (cycleIdx + 1) % allStyles.length;
+            const next = allStyles[cycleIdx];
+            promote(next);
+            loadStyle(next);
+            return next;
         }
     };
 }
@@ -654,23 +751,22 @@ function addMapControls(instance) {
     };
     fsControl.addTo(instance);
 
-    // Fond de carte
+    // Fond de carte : cycle Positron -> Routes -> OpenStreetMap
     const styleControl = L.control({ position: 'topright' });
     styleControl.onAdd = function() {
         const btn = L.DomUtil.create('button', 'map-control-btn');
         btn.type = 'button';
-        let nextStyle = 'streets';
-        const icons = { light: 'fa-satellite', streets: 'fa-map' };
-        const paint = () => {
-            btn.innerHTML = `<i class="fas ${icons[nextStyle]}"></i>`;
-            btn.title = nextStyle === 'streets' ? 'Vue routes' : 'Vue urbaine';
+        const icons = { light: 'fa-satellite', streets: 'fa-map', osm: 'fa-globe' };
+        const paint = (key) => {
+            btn.innerHTML = `<i class="fas ${icons[key] || 'fa-map'}"></i>`;
+            btn.title = `Fond: ${(BASEMAPS[key] || {}).nom || key}`;
         };
-        paint();
+        paint(mapBaseLayer ? mapBaseLayer.current : 'light');
         L.DomEvent.on(btn, 'click', (e) => {
             L.DomEvent.stop(e);
-            if (mapBaseLayer) mapBaseLayer.setStyle(nextStyle);
-            nextStyle = nextStyle === 'streets' ? 'light' : 'streets';
-            paint();
+            if (!mapBaseLayer) return;
+            const key = mapBaseLayer.cycle();
+            paint(key);
         });
         return btn;
     };
@@ -735,6 +831,12 @@ function addCityBadge(instance, city) {
 let mapBaseLayer = null;
 let initialViewDone = false;
 
+// Fond de carte retenu par l'utilisateur (survit aux rechargements)
+function getPreferredBasemap() {
+    const saved = localStorage.getItem('citizen_basemap');
+    return BASEMAPS[saved] ? saved : 'light';
+}
+
 function initMap() {
     const city = CITIES[currentCity] || CITIES[DEFAULT_CITY];
 
@@ -751,7 +853,14 @@ function initMap() {
     map.on('mouseout', () => map.scrollWheelZoom.disable());
     map.on('focus', () => map.scrollWheelZoom.enable());
 
-    mapBaseLayer = createBaseLayer(map);
+    const preferred = getPreferredBasemap();
+    // Le fond choisi passe en tete, les autres restent disponibles en repli
+    const order = [preferred, 'light', 'streets', 'osm'].filter((v, i, a) => a.indexOf(v) === i);
+
+    mapBaseLayer = createBaseLayer(map, order, (key) => {
+        localStorage.setItem('citizen_basemap', key);
+    });
+
     addMapControls(map);
     addServiceArea(map, city);
     addCityBadge(map, city);

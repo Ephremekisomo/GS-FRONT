@@ -109,71 +109,165 @@ async function loadCurrentUser() {
 // Fonds de carte disponibles (aucune cle API requise)
 const BASEMAPS = {
     dark: {
+        nom: 'Nuit',
         url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
         subdomains: 'abcd',
         maxZoom: 20
     },
     light: {
+        nom: 'Jour',
         url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
         subdomains: 'abcd',
         maxZoom: 20
     },
     streets: {
+        nom: 'Routes',
         url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
         subdomains: 'abcd',
         maxZoom: 20
     },
     osm: {
-        url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        nom: 'OpenStreetMap',
+        url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-        subdomains: 'abc',
+        subdomains: '',
         maxZoom: 19
     }
 };
+
+// Tuile transparente : en cas d'echec, aucune image cassee ne s'affiche
+const TRANSPARENT_TILE = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+
+// Une vraie tuile fait 256x256. Les images d'erreur ("Api key required",
+// "missing key", ...) sont plus petites : on les detecte par leur taille.
+const MIN_TILE_SIZE = 200;
+
+function isValidTileImage(img) {
+    return !!img && img.complete && img.naturalWidth >= MIN_TILE_SIZE && img.naturalHeight >= MIN_TILE_SIZE;
+}
+
+// Verifie qu'un fond de carte livre de vraies tuiles avant de l'utiliser
+function probeBasemap(key) {
+    return new Promise((resolve) => {
+        const cfg = BASEMAPS[key];
+        if (!cfg) return resolve(false);
+
+        const sub = cfg.subdomains ? cfg.subdomains.charAt(0) : 'a';
+        const url = cfg.url
+            .replace('{s}', sub || 'a')
+            .replace('{z}', 12).replace('{x}', 2380).replace('{y}', 2066)
+            .replace('{r}', '')
+            .replace('{ratio}', '');
+
+        const img = new Image();
+        let done = false;
+        const finish = (ok) => {
+            if (done) return;
+            done = true;
+            clearTimeout(timer);
+            img.onload = null;
+            img.onerror = null;
+            resolve(ok);
+        };
+        const timer = setTimeout(() => finish(false), 9000);
+        img.onload = () => finish(isValidTileImage(img));
+        img.onerror = () => finish(false);
+        img.src = url + (url.indexOf('?') === -1 ? '?' : '&') + 'v=' + Date.now();
+    });
+}
 
 let mapBaseLayer = null;
 let basemapStyle = localStorage.getItem('sc_basemap') || 'dark';
 
 // Cree un fond de carte avec repli automatique en cas d'echec
-function createBaseLayer(instance, styleNames) {
-    const order = styleNames || ['dark', 'light', 'streets', 'osm'];
-    let index = 0;
+function createBaseLayer(instance, styleNames, onChange) {
+    // Liste fixe des fonds : sert au cycle manuel
+    const allStyles = (styleNames || ['dark', 'light', 'osm']).slice();
+    // Chaine de repli automatique, reordonnee selon le fond actif
+    const order = allStyles.slice();
     let layer = null;
+    let active = order[0];
+    let cycleIdx = 0;
+    let loadSeq = 0;
 
-    const loadNext = () => {
-        if (index >= order.length) return;
+    const loadStyle = (key) => {
+        if (!BASEMAPS[key]) return;
+        const mySeq = ++loadSeq;
         if (layer) instance.removeLayer(layer);
+        active = key;
 
-        const config = BASEMAPS[order[index++]];
+        const config = BASEMAPS[key];
+        let errored = 0;
+        let invalid = 0;
+
         layer = L.tileLayer(config.url, {
             attribution: config.attribution,
             subdomains: config.subdomains,
             maxZoom: config.maxZoom,
-            detectRetina: true
+            detectRetina: true,
+            errorTileUrl: TRANSPARENT_TILE,
+            crossOrigin: true
         });
 
-        let errors = 0;
+        const fallbackTo = (reason) => {
+            if (mySeq !== loadSeq) return;
+            const next = order[order.indexOf(key) + 1];
+            if (next) {
+                console.warn(`Fond de carte "${config.nom}" inutilisable (${reason}), bascule sur "${BASEMAPS[next].nom}"`);
+                loadStyle(next);
+            }
+        };
+
         layer.on('tileerror', () => {
-            errors++;
-            if (errors >= 4) loadNext();
+            errored++;
+            if (errored >= 3) fallbackTo('erreurs reseau');
+        });
+
+        layer.on('tileload', (e) => {
+            if (isValidTileImage(e.tile)) { errored = 0; invalid = 0; return; }
+            invalid++;
+            if (invalid >= 3) fallbackTo('images invalides');
         });
 
         layer.addTo(instance);
+        if (onChange) onChange(key);
+
+        probeBasemap(key).then((ok) => {
+            if (mySeq !== loadSeq) return;
+            if (!ok) fallbackTo('sonde invalide');
+        });
     };
 
-    loadNext();
+    loadStyle(order[0]);
+
+    const promote = (name) => {
+        const i = order.indexOf(name);
+        if (i === -1) return false;
+        order.splice(i, 1);
+        order.unshift(name);
+        return true;
+    };
+
     return {
         get layer() { return layer; },
-        setStyle(name) {
-            if (order.includes(name)) {
-                order.splice(order.indexOf(name), 1);
-                order.unshift(name);
-                index = 0;
-                loadNext();
-            }
+        get current() { return active; },
+        list() { return allStyles.slice(); },
+        use(name) {
+            if (!promote(name)) return;
+            const i = allStyles.indexOf(name);
+            if (i !== -1) cycleIdx = i;
+            loadStyle(name);
+        },
+        cycle() {
+            if (allStyles.length < 2) return active;
+            cycleIdx = (cycleIdx + 1) % allStyles.length;
+            const next = allStyles[cycleIdx];
+            promote(next);
+            loadStyle(next);
+            return next;
         }
     };
 }
@@ -217,24 +311,21 @@ function addMapControls(instance) {
     };
     fsControl.addTo(instance);
 
-    // Basemap jour / nuit
+    // Cycle des fonds de carte (le choix est memorise)
     const styleControl = L.control({ position: 'topright' });
     styleControl.onAdd = function() {
         const btn = L.DomUtil.create('button', 'sc-map-control');
         btn.type = 'button';
-        btn.title = 'Vue jour / nuit';
-        const paint = () => {
-            btn.innerHTML = basemapStyle === 'dark'
-                ? '<i class="fas fa-sun"></i>'
-                : '<i class="fas fa-moon"></i>';
+        const icons = { dark: 'fa-moon', light: 'fa-sun', streets: 'fa-map', osm: 'fa-globe' };
+        const paint = (key) => {
+            btn.innerHTML = `<i class="fas ${icons[key] || 'fa-map'}"></i>`;
+            btn.title = `Fond: ${(BASEMAPS[key] || {}).nom || key}`;
         };
-        paint();
+        paint(mapBaseLayer ? mapBaseLayer.current : basemapStyle);
         L.DomEvent.on(btn, 'click', (e) => {
             L.DomEvent.stop(e);
-            basemapStyle = basemapStyle === 'dark' ? 'light' : 'dark';
-            localStorage.setItem('sc_basemap', basemapStyle);
-            paint();
-            if (mapBaseLayer) mapBaseLayer.setStyle(basemapStyle);
+            if (!mapBaseLayer) return;
+            paint(mapBaseLayer.cycle());
         });
         return btn;
     };
@@ -266,7 +357,14 @@ function initMap() {
         fadeAnimation: true
     }).setView([DEFAULT_LAT, DEFAULT_LNG], 12);
 
-    mapBaseLayer = createBaseLayer(map, [basemapStyle, 'dark', 'light', 'streets', 'osm']);
+    const preferred = BASEMAPS[basemapStyle] ? basemapStyle : 'dark';
+    const order = [preferred, 'dark', 'light', 'osm'].filter((v, i, a) => a.indexOf(v) === i);
+
+    mapBaseLayer = createBaseLayer(map, order, (key) => {
+        basemapStyle = key;
+        localStorage.setItem('sc_basemap', key);
+    });
+
     addMapControls(map);
     addLegend(map);
 

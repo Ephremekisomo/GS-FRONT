@@ -417,14 +417,24 @@ section.active {
 .map-container {
     height: 340px;
     width: 100%;
-    background: #e8eaed;
+    /* Grille de fond : la carte reste lisible meme si aucun fond distant ne charge */
+    background-color: #e8eaed;
+    background-image:
+        linear-gradient(rgba(52, 152, 219, 0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(52, 152, 219, 0.08) 1px, transparent 1px);
+    background-size: 48px 48px;
     font-family: var(--font-family, inherit);
 }
 
 /* Leaflet container polish */
 .map-container .leaflet-container {
-    background: #e8eaed;
+    background: transparent;
     font: inherit;
+}
+
+/* Tuile en erreur : invisible, la grille reste visible */
+.map-container .leaflet-tile.leaflet-error-tile {
+    opacity: 0;
 }
 
 .map-container .leaflet-control-attribution {

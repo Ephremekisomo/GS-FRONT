@@ -1287,12 +1287,22 @@ section.active {
 
 .map-container {
     position: relative;
-    background: #0f1420;
+    /* Grille de fond : les marqueurs restent visibles meme si aucun fond distant ne charge */
+    background-color: #0f1420;
+    background-image:
+        linear-gradient(rgba(52, 152, 219, 0.09) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(52, 152, 219, 0.09) 1px, transparent 1px);
+    background-size: 48px 48px;
 }
 
 .map-container .leaflet-container {
-    background: #0f1420;
+    background: transparent;
     font: inherit;
+}
+
+/* Tuile en erreur : invisible, la grille reste visible */
+.map-container .leaflet-tile.leaflet-error-tile {
+    opacity: 0;
 }
 
 /* Controles */
