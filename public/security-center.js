@@ -1613,7 +1613,7 @@ async function deleteAdminMessage(messageId) {
         }
         
         if (response.ok) {
-            showToast('Message supprimé', 'success');
+            showToast('Message supprimÃ©', 'success');
         } else {
             // If API fails, reload to restore state
             const error = await response.json();
@@ -1734,7 +1734,7 @@ async function initAdminVoiceRecording() {
                 showToast('Enregistrement en cours...', 'info');
             } catch (error) {
                 console.error('Error accessing microphone:', error);
-                showToast('Erreur d\'accès au microphone', 'error');
+                showToast('Erreur d\'accÃ¨s au microphone', 'error');
             }
         } else {
             // Stop recording
@@ -1749,7 +1749,7 @@ async function initAdminVoiceRecording() {
 
 async function sendAdminVoiceMessage(audioBlob, extension = 'webm') {
     if (!currentChatUser) {
-        showToast('Sélectionnez un utilisateur pour envoyer un message vocal', 'error');
+        showToast('SÃ©lectionnez un utilisateur pour envoyer un message vocal', 'error');
         return;
     }
     
@@ -1779,7 +1779,7 @@ async function sendAdminVoiceMessage(audioBlob, extension = 'webm') {
         console.log('Admin voice response status:', response.status);
         
         if (response.ok) {
-            showToast('Message vocal envoyé', 'success');
+            showToast('Message vocal envoyÃ©', 'success');
             loadMessages(currentChatUser.id);
         } else {
             const error = await response.json();
@@ -1847,7 +1847,7 @@ document.getElementById('export-pdf').addEventListener('click', () => {
     // Title
     doc.setFontSize(22);
     doc.setTextColor(255, 255, 255);
-    doc.text('CENTRE DE SECURITE DE GOMA', 45, 15);
+    doc.text('CENTRE DE SECURITE 404SIGNALISATION', 45, 15);
     doc.setFontSize(12);
     doc.text('Rapport des Alertes', 45, 23);
     
@@ -1960,10 +1960,10 @@ document.getElementById('export-pdf').addEventListener('click', () => {
         doc.setFontSize(8);
         doc.setTextColor(128, 128, 128);
         doc.text(`Page ${i} sur ${pageCount}`, 260, 200);
-        doc.text('Centre de Securite de Goma - Republique Democratique du Congo', 15, 200);
+        doc.text('Centre de Securite 404Signalisation - Republique Democratique du Congo', 15, 200);
     }
     
-    doc.save('rapport-alertes-goma-security.pdf');
+    doc.save('rapport-alertes-404signalisation.pdf');
     showToast('PDF exporte avec succes', 'success');
 });
 
@@ -1983,7 +1983,7 @@ document.getElementById('export-excel').addEventListener('click', () => {
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Alertes');
-    XLSX.writeFile(wb, 'alertes-goma-security.xlsx');
+    XLSX.writeFile(wb, 'alertes-404signalisation.xlsx');
     showToast('Excel exporte avec succes', 'success');
 });
 
@@ -2017,7 +2017,7 @@ document.getElementById('export-csv').addEventListener('click', () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'alertes-goma-security.csv';
+    a.download = 'alertes-404signalisation.csv';
     a.click();
     showToast('CSV exporte avec succes', 'success');
 });
