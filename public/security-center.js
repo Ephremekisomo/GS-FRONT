@@ -152,10 +152,13 @@ function initMap() {
 async function loadAlerts() {
     const status = document.getElementById('filter-status').value;
     const priority = document.getElementById('filter-priority').value;
+    const villeEl = document.getElementById('filter-ville');
+    const ville = villeEl ? villeEl.value : '';
     
     let url = `${API_URL}/api/alerts?`;
-    if (status) url += `status=${status}&`;
+    if (status) url += `status=${encodeURIComponent(status)}&`;
     if (priority) url += `priority=${priority}&`;
+    if (ville) url += `ville=${encodeURIComponent(ville)}&`;
     
     try {
         const token = localStorage.getItem('admin_token');
@@ -174,7 +177,7 @@ async function loadAlerts() {
         // Sort alerts by date - newest first
         alerts.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
         renderAlerts();
-        updateMapMarkers();
+        updateMapMarkers(true);
     } catch (error) {
         showToast('Erreur de chargement des alertes', 'error');
     }
@@ -205,6 +208,7 @@ function renderAlerts() {
             <div class="alert-item-meta">
                 ${alert.nom} ${alert.prenom} - ${formatDate(alert.created_at)}
                 <span class="alert-item-priority">P${alert.priority}</span>
+                ${alert.ville ? `<span class="alert-item-ville"><i class="fas fa-city"></i> ${alert.ville}</span>` : ''}
                 ${alert.assigned_to ? `<span class="alert-item-assigned">${getPosteLabel(alert.assigned_role || alert.assigned_to)}</span>` : ''}
             </div>
             <div class="alert-item-actions">
@@ -258,7 +262,7 @@ function renderAlerts() {
     });
 }
 
-function updateMapMarkers() {
+function updateMapMarkers(fitView = false) {
     // Remove existing markers
     Object.values(alertMarkers).forEach(marker => map.removeLayer(marker));
     alertMarkers = {};
@@ -278,6 +282,29 @@ function updateMapMarkers() {
             alertMarkers[alert.id] = marker;
         }
     });
+    
+    // Ajuste la vue sur les alertes affichees
+    if (fitView) {
+        fitMapToAlerts();
+    }
+}
+
+// Centre la carte sur les coordonnees des alertes affichees
+function fitMapToAlerts() {
+    if (!map) return;
+    
+    const points = alerts
+        .filter(a => a.latitude && a.longitude)
+        .map(a => [parseFloat(a.latitude), parseFloat(a.longitude)]);
+    
+    if (points.length === 0) return;
+    
+    if (points.length === 1) {
+        map.setView(points[0], 15);
+        return;
+    }
+    
+    map.fitBounds(L.latLngBounds(points).pad(0.15));
 }
 
 function showAlertDetails(alertId) {
@@ -292,10 +319,13 @@ function showAlertDetails(alertId) {
     document.getElementById('detail-user').textContent = `${selectedAlert.nom} ${selectedAlert.prenom}`;
     document.getElementById('detail-telephone').textContent = selectedAlert.telephone;
     document.getElementById('detail-description').textContent = selectedAlert.description || 'Sans description';
-    // Display quartier and avenue instead of GPS coordinates
+    // Display city, quartier and avenue
     let locationText = '';
+    if (selectedAlert.ville) {
+        locationText += selectedAlert.ville;
+    }
     if (selectedAlert.quartier) {
-        locationText += selectedAlert.quartier;
+        locationText += locationText ? ', ' + selectedAlert.quartier : selectedAlert.quartier;
     }
     if (selectedAlert.avenue) {
         locationText += locationText ? ', ' + selectedAlert.avenue : selectedAlert.avenue;

@@ -9,9 +9,88 @@
 const API_URL = 'https://gomasecures-backend.onrender.com';
 const SOCKET_URL = 'https://gomasecures-backend.onrender.com';
 
-// Goma default coordinates
-const DEFAULT_LAT = -1.6879163817734162;
-const DEFAULT_LNG = 29.2316536515724;
+// Villes couvertes par l'application
+const CITIES = {
+    'Goma': {
+        nom: 'Goma',
+        lat: -1.6879163817734162,
+        lng: 29.2316536515724,
+        minLat: -2.5,
+        maxLat: -1.0,
+        minLng: 28.5,
+        maxLng: 30.0,
+        quartiers: [
+            { name: "Les Volcans", lat: -1.680, lng: 29.230 },
+            { name: "Ndosho", lat: -1.700, lng: 29.240 },
+            { name: "Majengo", lat: -1.690, lng: 29.220 },
+            { name: "Virunga", lat: -1.670, lng: 29.250 },
+            { name: "Murara", lat: -1.660, lng: 29.260 },
+            { name: "Lac vert", lat: -1.710, lng: 29.230 },
+            { name: "Katindo", lat: -1.690, lng: 29.250 },
+            { name: "Himbi", lat: -1.680, lng: 29.240 },
+            { name: "Mabanga nord", lat: -1.670, lng: 29.220 },
+            { name: "Mabanga sud", lat: -1.680, lng: 29.210 },
+            { name: "Mapendo", lat: -1.700, lng: 29.260 },
+            { name: "Mikeno", lat: -1.660, lng: 29.230 },
+            { name: "Mugunga", lat: -1.720, lng: 29.250 },
+            { name: "Nyiragongo", lat: -1.650, lng: 29.270 },
+            { name: "Goma ville", lat: -1.689, lng: 29.230 },
+            { name: "Kyeshero", lat: -1.640, lng: 29.280 },
+            { name: "Bujovu", lat: -1.730, lng: 29.220 }
+        ]
+    },
+    'Kinshasa': {
+        nom: 'Kinshasa',
+        lat: -4.3276,
+        lng: 15.3136,
+        minLat: -5.2,
+        maxLat: -3.8,
+        minLng: 14.8,
+        maxLng: 16.1,
+        quartiers: [
+            { name: "Gombe", lat: -4.305, lng: 15.315 },
+            { name: "Lingwala", lat: -4.325, lng: 15.305 },
+            { name: "Barumbu", lat: -4.315, lng: 15.325 },
+            { name: "Kasa-Vubu", lat: -4.340, lng: 15.290 },
+            { name: "Bandalungwa", lat: -4.345, lng: 15.270 },
+            { name: "Lemba", lat: -4.390, lng: 15.290 },
+            { name: "Ngaliema", lat: -4.300, lng: 15.250 },
+            { name: "Mont-Ngafula", lat: -4.370, lng: 15.250 },
+            { name: "Selembao", lat: -4.380, lng: 15.270 },
+            { name: "Limete", lat: -4.365, lng: 15.330 },
+            { name: "Matete", lat: -4.395, lng: 15.320 },
+            { name: "Ngiri-Ngiri", lat: -4.380, lng: 15.310 },
+            { name: "Masina", lat: -4.355, lng: 15.310 },
+            { name: "Makala", lat: -4.370, lng: 15.340 },
+            { name: "Lomete", lat: -4.400, lng: 15.330 },
+            { name: "Ngaba", lat: -4.410, lng: 15.330 },
+            { name: "Kimbanseke", lat: -4.450, lng: 15.350 },
+            { name: "Bumbu", lat: -4.430, lng: 15.300 },
+            { name: "N'Djili", lat: -4.470, lng: 15.360 },
+            { name: "Maluku", lat: -4.410, lng: 15.280 },
+            { name: "Kinshasa Centre", lat: -4.328, lng: 15.314 }
+        ]
+    }
+};
+
+const CITY_NAMES = Object.keys(CITIES);
+const DEFAULT_CITY = 'Goma';
+
+// Quartiers de Goma (compatibilite)
+const GOMA_QUARTIERS = CITIES['Goma'].quartiers;
+
+// Quartiers de Kinshasa
+const KINSHASA_QUARTIERS = CITIES['Kinshasa'].quartiers;
+
+// Ville active de l'utilisateur
+let currentCity = DEFAULT_CITY;
+
+// Ville de l'alerte en cours (deduite de la position GPS)
+let currentAlertCity = DEFAULT_CITY;
+
+// Coordonnees par defaut (ville active)
+let DEFAULT_LAT = CITIES[DEFAULT_CITY].lat;
+let DEFAULT_LNG = CITIES[DEFAULT_CITY].lng;
 
 // =====================
 // STATE
@@ -37,27 +116,6 @@ let callSession = {
 function createCallId() {
     return `call-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
 }
-
-// Goma neighborhoods with approximate centers
-const GOMA_QUARTIERS = [
-    { name: "Les Volcans", lat: -1.680, lng: 29.230 },
-    { name: "Ndosho", lat: -1.700, lng: 29.240 },
-    { name: "Majengo", lat: -1.690, lng: 29.220 },
-    { name: "Virunga", lat: -1.670, lng: 29.250 },
-    { name: "Murara", lat: -1.660, lng: 29.260 },
-    { name: "Lac vert", lat: -1.710, lng: 29.230 },
-    { name: "Katindo", lat: -1.690, lng: 29.250 },
-    { name: "Himbi", lat: -1.680, lng: 29.240 },
-    { name: "Mabanga nord", lat: -1.670, lng: 29.220 },
-    { name: "Mabanga sud", lat: -1.680, lng: 29.210 },
-    { name: "Mapendo", lat: -1.700, lng: 29.260 },
-    { name: "Mikeno", lat: -1.660, lng: 29.230 },
-    { name: "Mugunga", lat: -1.720, lng: 29.250 },
-    { name: "Nyiragongo", lat: -1.650, lng: 29.270 },
-    { name: "Goma ville", lat: -1.689, lng: 29.230 },
-    { name: "Kyeshero", lat: -1.640, lng: 29.280 },
-    { name: "Bujovu", lat: -1.730, lng: 29.220 }
-];
 
 function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
     const R = 6371;
@@ -93,10 +151,11 @@ async function getAddressFromCoords(lat, lng) {
 }
 
 function getQuartierFromCoords(lat, lng) {
+    const city = CITIES[currentCity] || CITIES[DEFAULT_CITY];
     let closestQuartier = null;
     let minDistance = Infinity;
     
-    for (const quartier of GOMA_QUARTIERS) {
+    for (const quartier of city.quartiers) {
         const distance = getDistanceFromLatLonInKm(lat, lng, quartier.lat, quartier.lng);
         if (distance < minDistance) {
             minDistance = distance;
@@ -105,6 +164,59 @@ function getQuartierFromCoords(lat, lng) {
     }
     
     return closestQuartier;
+}
+
+// Verifie qu'une position est dans les limites d'une ville
+function isPositionInCity(lat, lng, ville) {
+    const city = CITIES[ville] || CITIES[DEFAULT_CITY];
+    return lat >= city.minLat && lat <= city.maxLat && lng >= city.minLng && lng <= city.maxLng;
+}
+
+// Deduit la ville a partir des coordonnees GPS
+function getCityFromPosition(lat, lng) {
+    return CITY_NAMES.find(city => isPositionInCity(lat, lng, city)) || null;
+}
+
+// Definit la ville active et met a jour les coordonnees par defaut
+function setCurrentCity(ville) {
+    const city = CITIES[ville] ? ville : DEFAULT_CITY;
+    currentCity = city;
+    DEFAULT_LAT = CITIES[city].lat;
+    DEFAULT_LNG = CITIES[city].lng;
+    if (currentUser) {
+        currentUser.ville = city;
+    }
+    return city;
+}
+
+// Remplit un <select> avec les quartiers de la ville
+function populateQuartierSelect(selectId, ville, selectedValue) {
+    const select = document.getElementById(selectId);
+    if (!select) return;
+    
+    const city = CITIES[ville] || CITIES[DEFAULT_CITY];
+    const quartiers = city.quartiers.map(q => q.name);
+    
+    select.innerHTML = '<option value="">Selectionner...</option>';
+    quartiers.forEach(name => {
+        const option = document.createElement('option');
+        option.value = name;
+        option.textContent = name;
+        if (name === selectedValue) option.selected = true;
+        select.appendChild(option);
+    });
+    
+    const autre = document.createElement('option');
+    autre.value = 'Autre';
+    autre.textContent = 'Autre';
+    select.appendChild(autre);
+    
+    if (selectedValue && !quartiers.includes(selectedValue) && selectedValue !== 'Autre') {
+        const custom = document.createElement('option');
+        custom.value = selectedValue;
+        custom.textContent = selectedValue;
+        select.appendChild(custom);
+    }
 }
 
 // =====================
@@ -118,9 +230,13 @@ function checkAuth() {
         // Decode token to get user info
         const userRole = getUserRoleFromToken(token);
         const userId = getCurrentUserId();
+        const userVille = getUserCityFromToken(token);
         
         // Build currentUser object from token
-        currentUser = { id: userId, role: userRole };
+        currentUser = { id: userId, role: userRole, ville: userVille };
+        setCurrentCity(userVille);
+        populateQuartierSelect('reg-quartier', currentCity);
+        populateQuartierSelect('profile-quartier', currentCity);
         
         // Role-based redirection for existing sessions
         if (userRole === 'admin') {
@@ -153,6 +269,16 @@ function getUserRoleFromToken(token) {
     }
 }
 
+// Get user city from JWT token
+function getUserCityFromToken(token) {
+    try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        return payload.ville || DEFAULT_CITY;
+    } catch (e) {
+        return DEFAULT_CITY;
+    }
+}
+
 // Login
 document.getElementById('login-form').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -177,6 +303,8 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
             } else {
                 localStorage.setItem('token', data.token);
                 currentUser = data.user;
+                setCurrentCity(currentUser.ville);
+                populateQuartierSelect('profile-quartier', currentCity, currentUser.quartier);
                 
                 // Role-based redirection
                 if (currentUser.role === 'admin') {
@@ -223,6 +351,8 @@ document.getElementById('verify-2fa-form').addEventListener('submit', async (e) 
         if (response.ok) {
             localStorage.setItem('token', data.token);
             currentUser = data.user;
+            setCurrentCity(currentUser.ville);
+            populateQuartierSelect('profile-quartier', currentCity, currentUser.quartier);
             
             // Role-based redirection after 2FA
             if (currentUser.role === 'admin') {
@@ -260,6 +390,7 @@ document.getElementById('register-form').addEventListener('submit', async (e) =>
         telephone: document.getElementById('reg-telephone').value,
         email: document.getElementById('reg-email').value,
         password: document.getElementById('reg-password').value,
+        ville: document.getElementById('reg-ville').value,
         quartier: document.getElementById('reg-quartier').value,
         avenue: document.getElementById('reg-avenue').value
     };
@@ -276,6 +407,8 @@ document.getElementById('register-form').addEventListener('submit', async (e) =>
         if (response.ok) {
             localStorage.setItem('token', data.token);
             currentUser = data.user;
+            setCurrentCity(currentUser.ville);
+            populateQuartierSelect('profile-quartier', currentCity, formData.quartier);
             showToast('Inscription reussie!', 'success');
             showDashboard();
             initApp();
@@ -333,10 +466,10 @@ function showDashboard() {
 async function initApp() {
     initCallButtons();
     await loadEmergencyTypes();
+    await loadUserProfile();
     initMap();
     initSocket();
     getUserLocation();
-    await loadUserProfile();
     initCallSocket();
 }
 
@@ -535,6 +668,7 @@ function updateLocationDisplay() {
     if (currentPosition) {
         const latEl = document.getElementById('alert-location').querySelector('.lat');
         const lngEl = document.getElementById('alert-location').querySelector('.lng');
+        const villeEl = document.getElementById('alert-location').querySelector('.ville');
         const quartierEl = document.getElementById('alert-location').querySelector('.quartier');
         const avenueEl = document.getElementById('alert-location').querySelector('.avenue-display');
         const accuracyEl = document.getElementById('alert-location').querySelector('.accuracy');
@@ -542,6 +676,9 @@ function updateLocationDisplay() {
         if (latEl) latEl.textContent = `Lat: ${currentPosition.lat.toFixed(6)}`;
         if (lngEl) lngEl.textContent = `Lng: ${currentPosition.lng.toFixed(6)}`;
         
+        if (villeEl) {
+            villeEl.innerHTML = `<i class="fas fa-city"></i> <strong>Ville:</strong> ${currentAlertCity}`;
+        }
         if (quartierEl) {
             quartierEl.innerHTML = `<i class="fas fa-map-pin"></i> <strong>Quartier:</strong> ${currentQuartier || 'Non detecte'}`;
         }
@@ -572,6 +709,15 @@ document.getElementById('emergency-btn').addEventListener('click', async () => {
         
         currentPosition = location;
         
+        // Deduit la ville depuis les coordonnees GPS
+        const detectedCity = getCityFromPosition(location.lat, location.lng);
+        if (!detectedCity) {
+            showToast('Position hors zone de service (Goma / Kinshasa)', 'error');
+            return;
+        }
+        currentAlertCity = detectedCity;
+        setCurrentCity(detectedCity);
+        
         // Get real address from coordinates using reverse geocoding
         const addressData = await getAddressFromCoords(location.lat, location.lng);
         
@@ -582,7 +728,7 @@ document.getElementById('emergency-btn').addEventListener('click', async () => {
         const acc = parseFloat(location.accuracy);
         const quality = acc <= 10 ? 'haute' : acc <= 30 ? 'moyenne' : 'basse';
         
-        showToast(`${currentQuartier} - ${currentAvenue} (${Math.round(acc)}m)`, acc > 30 ? 'warning' : 'success');
+        showToast(`${currentAlertCity} - ${currentQuartier} - ${currentAvenue} (${Math.round(acc)}m)`, acc > 30 ? 'warning' : 'success');
         
         updateLocationDisplay();
         
@@ -628,6 +774,7 @@ document.getElementById('alert-form').addEventListener('submit', async (e) => {
     formData.append('accuracy', currentPosition.accuracy);
     formData.append('quartier', currentQuartier || '');
     formData.append('avenue', currentAvenue || '');
+    formData.append('ville', currentAlertCity);
     
     const photoFile = document.getElementById('alert-photo').files[0];
     if (photoFile) {
@@ -743,10 +890,15 @@ async function loadUserProfile() {
             currentUser.avenue = user.avenue;
         }
         
+        const ville = setCurrentCity(user.ville || (currentUser && currentUser.ville));
+        populateQuartierSelect('profile-quartier', ville, user.quartier);
+        
+        const villeSelect = document.getElementById('profile-ville');
+        if (villeSelect) villeSelect.value = ville;
+        
         document.getElementById('profile-nom').value = user.nom || '';
         document.getElementById('profile-prenom').value = user.prenom || '';
         document.getElementById('profile-email').value = user.email || '';
-        document.getElementById('profile-quartier').value = user.quartier || '';
     } catch (error) {
         console.error('Error loading profile:', error);
     }
@@ -1162,6 +1314,7 @@ document.getElementById('profile-form').addEventListener('submit', async (e) => 
         nom: document.getElementById('profile-nom').value,
         prenom: document.getElementById('profile-prenom').value,
         email: document.getElementById('profile-email').value,
+        ville: document.getElementById('profile-ville').value,
         quartier: document.getElementById('profile-quartier').value
     };
     
@@ -1177,6 +1330,7 @@ document.getElementById('profile-form').addEventListener('submit', async (e) => 
         });
         
         if (response.ok) {
+            setCurrentCity(formData.ville);
             showToast('Profil mis a jour', 'success');
         } else {
             showToast('Erreur de mise a jour', 'error');
@@ -1184,6 +1338,18 @@ document.getElementById('profile-form').addEventListener('submit', async (e) => 
     } catch (error) {
         showToast('Erreur de connexion', 'error');
     }
+});
+
+// Changer de ville (inscription) met a jour la liste des quartiers
+document.getElementById('reg-ville').addEventListener('change', (e) => {
+    const ville = setCurrentCity(e.target.value);
+    populateQuartierSelect('reg-quartier', ville);
+});
+
+// Changer de ville (profil) met a jour la liste des quartiers
+document.getElementById('profile-ville').addEventListener('change', (e) => {
+    const ville = setCurrentCity(e.target.value);
+    populateQuartierSelect('profile-quartier', ville);
 });
 
 // Setup 2FA
@@ -1889,4 +2055,9 @@ function initCallSocket() {
 // INITIALIZE
 // =====================
 
-document.addEventListener('DOMContentLoaded', checkAuth);
+document.addEventListener('DOMContentLoaded', () => {
+    // Remplir les listes de quartiers pour la ville par defaut
+    populateQuartierSelect('reg-quartier', DEFAULT_CITY);
+    populateQuartierSelect('profile-quartier', DEFAULT_CITY);
+    checkAuth();
+});

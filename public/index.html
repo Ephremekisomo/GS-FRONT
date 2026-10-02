@@ -121,38 +121,30 @@
                     
                     <div class="form-row">
                         <div class="form-group">
+                            <label for="reg-ville">
+                                <i class="fas fa-city"></i> Ville
+                            </label>
+                            <select id="reg-ville" required>
+                                <option value="Goma">Goma</option>
+                                <option value="Kinshasa">Kinshasa</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
                             <label for="reg-quartier">
                                 <i class="fas fa-map-marker-alt"></i> Quartier
                             </label>
                             <select id="reg-quartier">
                                 <option value="">Selectionner...</option>
-                                <option value="Les Volcans">Les Volcans</option>
-                                <option value="Ndosho">Ndosho</option>
-                                <option value="Majengo">Majengo</option>
-                                <option value="Virunga">Virunga</option>
-                                <option value="Murara">Murara</option>
-                                <option value="Lac vert">Lac vert</option>
-                                <option value="Katindo">Katindo</option>
-                                <option value="Himbi">Himbi</option>
-                                <option value="Mabanga nord">Mabanga nord</option>
-                                <option value="Mabanga sud">Mabanga sud</option>
-                                <option value="Mapendo">Mapendo</option>
-                                <option value="Mikeno">Mikeno</option>
-                                <option value="Mugunga">Mugunga</option>
-                                <option value="Nyiragongo">Nyiragongo</option>
-                                <option value="Goma ville">Goma ville</option>
-                                <option value="Kyeshero">Kyeshero</option>
-                                <option value="Bujovu">Bujovu</option>
-                                <option value="Autre">Autre</option>
                             </select>
                         </div>
-                        
-                        <div class="form-group">
-                            <label for="reg-avenue">
-                                <i class="fas fa-road"></i> Avenue
-                            </label>
-                            <input type="text" id="reg-avenue" placeholder="Votre avenue">
-                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="reg-avenue">
+                            <i class="fas fa-road"></i> Avenue
+                        </label>
+                        <input type="text" id="reg-avenue" placeholder="Votre avenue">
                     </div>
                     
                     <button type="submit" class="btn-primary">
@@ -242,6 +234,7 @@
                                         <span class="lng">Lng: --</span>
                                     </div>
                                     <div class="location-address">
+                                        <span class="ville"><i class="fas fa-city"></i> <strong>Ville:</strong> --</span>
                                         <span class="quartier"><i class="fas fa-map-pin"></i> <strong>Quartier:</strong> --</span>
                                         <span class="avenue-display"><i class="fas fa-road"></i> <strong>Avenue:</strong> --</span>
                                         <span class="accuracy"><i class="fas fa-crosshairs"></i> <strong>Precision:</strong> --</span>
@@ -323,26 +316,18 @@
                             <input type="email" id="profile-email">
                         </div>
                         <div class="form-group">
+                            <label for="profile-ville">
+                                <i class="fas fa-city"></i> Ville
+                            </label>
+                            <select id="profile-ville">
+                                <option value="Goma">Goma</option>
+                                <option value="Kinshasa">Kinshasa</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
                             <label for="profile-quartier">Quartier</label>
                             <select id="profile-quartier">
-                                <option value="Les Volcans">Les Volcans</option>
-                                <option value="Ndosho">Ndosho</option>
-                                <option value="Majengo">Majengo</option>
-                                <option value="Virunga">Virunga</option>
-                                <option value="Murara">Murara</option>
-                                <option value="Lac vert">Lac vert</option>
-                                <option value="Katindo">Katindo</option>
-                                <option value="Himbi">Himbi</option>
-                                <option value="Mabanga nord">Mabanga nord</option>
-                                <option value="Mabanga sud">Mabanga sud</option>
-                                <option value="Mapendo">Mapendo</option>
-                                <option value="Mikeno">Mikeno</option>
-                                <option value="Mugunga">Mugunga</option>
-                                <option value="Nyiragongo">Nyiragongo</option>
-                                <option value="Goma ville">Goma ville</option>
-                                <option value="Kyeshero">Kyeshero</option>
-                                <option value="Bujovu">Bujovu</option>
-                                <option value="Autre">Autre</option>
+                                <option value="">Selectionner...</option>
                             </select>
                         </div>
                         <button type="submit" class="btn-primary">Enregistrer</button>
