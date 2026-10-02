@@ -404,6 +404,14 @@ section.active {
     75% { transform: rotate(10deg); }
 }
 
+/* Map Section */
+.map-section {
+    margin: 15px 0;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+}
+
 /* Map Container */
 .map-container {
     height: 300px;

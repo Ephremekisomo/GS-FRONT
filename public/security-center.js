@@ -108,12 +108,27 @@ async function loadCurrentUser() {
 function initMap() {
     map = L.map('map').setView([DEFAULT_LAT, DEFAULT_LNG], 12);
     
-    // Use CartoDB Voyager tiles (colored, more detailed)
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    // Primary: CartoDB Voyager tiles (no API key required)
+    const cartoLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
         subdomains: 'abcd',
         maxZoom: 20
-    }).addTo(map);
+    });
+    
+    // Fallback: OpenStreetMap standard tiles
+    const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        maxZoom: 19
+    });
+    
+    cartoLayer.addTo(map);
+    
+    // Fallback if CartoDB fails
+    cartoLayer.on('tileerror', function() {
+        console.warn('CartoDB tiles failed, falling back to OpenStreetMap');
+        map.removeLayer(cartoLayer);
+        osmLayer.addTo(map);
+    });
     
     // Add Google Maps button
     const googleMapsBtn = L.control({position: 'bottomright'});
