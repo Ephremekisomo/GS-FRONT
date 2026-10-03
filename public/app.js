@@ -1861,6 +1861,53 @@ let isVideoCall = false;
 let isMuted = false;
 let isVideoOff = false;
 let currentCallData = null;
+let remoteDescriptionReady = false;
+let pendingRemoteCandidates = [];
+
+// Wait until ICE gathering is complete (or the timeout expires) so the SDP we
+// send already contains candidates. Trickle ICE stays enabled as a fallback.
+function waitForIceGathering(pc, timeoutMs = 2500) {
+    return new Promise((resolve) => {
+        if (!pc || pc.iceGatheringState === 'complete') {
+            resolve();
+            return;
+        }
+
+        let settled = false;
+        const finish = () => {
+            if (settled) return;
+            settled = true;
+            pc.removeEventListener('icegatheringstatechange', onStateChange);
+            clearTimeout(timer);
+            resolve();
+        };
+        const onStateChange = () => {
+            if (pc.iceGatheringState === 'complete') finish();
+        };
+
+        pc.addEventListener('icegatheringstatechange', onStateChange);
+        const timer = setTimeout(finish, timeoutMs);
+    });
+}
+
+async function flushPendingRemoteCandidates() {
+    if (!pendingRemoteCandidates.length || !peerConnection) return;
+    const queued = pendingRemoteCandidates;
+    pendingRemoteCandidates = [];
+    for (const candidate of queued) {
+        try {
+            await peerConnection.addIceCandidate(candidate);
+        } catch (error) {
+            console.warn('Error adding queued ICE candidate:', error);
+        }
+    }
+}
+
+function resetWebrtcState() {
+    remoteDescriptionReady = false;
+    pendingRemoteCandidates = [];
+    remoteStream = null;
+}
 let ICE_SERVERS = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
@@ -1897,12 +1944,14 @@ function createPeerConnection() {
         peerConnection.close();
         peerConnection = null;
     }
-    
+
+    resetWebrtcState();
     peerConnection = new RTCPeerConnection(ICE_SERVERS);
     
     peerConnection.onicecandidate = (event) => {
         if (event.candidate) {
             socket.emit('webrtc-ice-candidate', {
+                callId: callSession.callId || currentCallData?.callId,
                 callerId: currentUser.id,
                 target: 'security-center',
                 candidate: event.candidate
@@ -1911,8 +1960,15 @@ function createPeerConnection() {
     };
     
     peerConnection.ontrack = (event) => {
-        console.log('Remote track received:', event);
-        attachRemoteMediaStream(event.streams[0]);
+        console.log('Remote track received:', event.track.kind);
+        const [stream] = event.streams;
+        if (stream) {
+            attachRemoteMediaStream(stream);
+        } else {
+            if (!remoteStream) remoteStream = new MediaStream();
+            remoteStream.addTrack(event.track);
+            attachRemoteMediaStream(remoteStream);
+        }
     };
     
     peerConnection.oniceconnectionstatechange = () => {
@@ -1949,19 +2005,34 @@ function attachRemoteMediaStream(stream) {
     const remoteVideo = document.getElementById('remote-video');
     const remoteAudio = document.getElementById('remote-audio');
 
-    if (remoteVideo && stream) {
-        remoteVideo.srcObject = stream;
-        remoteVideo.muted = false;
-        remoteVideo.volume = 1;
-        remoteVideo.style.display = isVideoCall ? 'block' : 'none';
-        remoteVideo.play().catch(() => console.log('Autoplay remote video blocked'));
-    }
-
-    if (remoteAudio && stream) {
-        remoteAudio.srcObject = stream;
-        remoteAudio.muted = false;
-        remoteAudio.volume = 1;
-        remoteAudio.play().catch(() => console.log('Autoplay remote audio blocked'));
+    // Never attach the same stream to both elements: the audio would be
+    // rendered twice (the <audio> tag keeps playing even when hidden).
+    if (isVideoCall) {
+        if (remoteAudio) {
+            remoteAudio.srcObject = null;
+            remoteAudio.muted = true;
+        }
+        if (remoteVideo) {
+            remoteVideo.srcObject = stream;
+            remoteVideo.muted = false;
+            remoteVideo.volume = 1;
+            remoteVideo.autoplay = true;
+            remoteVideo.playsInline = true;
+            remoteVideo.style.display = 'block';
+            remoteVideo.play().catch(() => console.log('Autoplay remote video blocked'));
+        }
+    } else {
+        if (remoteVideo) {
+            remoteVideo.srcObject = null;
+            remoteVideo.muted = true;
+            remoteVideo.style.display = 'none';
+        }
+        if (remoteAudio) {
+            remoteAudio.srcObject = stream;
+            remoteAudio.muted = false;
+            remoteAudio.volume = 1;
+            remoteAudio.play().catch(() => console.log('Autoplay remote audio blocked'));
+        }
     }
 }
 
@@ -2041,6 +2112,7 @@ function rejectCall() {
     currentCallData = null;
     activeCall = null;
     callSession = { callId: null, type: 'audio', status: 'idle' };
+    resetWebrtcState();
     stopRingtone();
     document.getElementById('incoming-call-modal').classList.add('hidden');
 }
@@ -2065,9 +2137,12 @@ function endCall() {
     document.getElementById('incoming-call-modal').classList.add('hidden');
     document.getElementById('local-video').srcObject = null;
     document.getElementById('remote-video').srcObject = null;
+    document.getElementById('remote-audio').srcObject = null;
+    isVideoCall = false;
     currentCallData = null;
     activeCall = null;
     callSession = { callId: null, type: 'audio', status: 'idle' };
+    resetWebrtcState();
     stopRingtone();
 }
 
@@ -2118,9 +2193,10 @@ async function startOutgoingCall() {
         
         const offer = await peerConnection.createOffer();
         await peerConnection.setLocalDescription(offer);
+        await waitForIceGathering(peerConnection);
         
         const webrtcOfferData = {
-            sdp: peerConnection.localDescription
+            sdp: { type: peerConnection.localDescription.type, sdp: peerConnection.localDescription.sdp }
         };
 
         const payload = {
@@ -2211,7 +2287,7 @@ function initCallButtons() {
     if (btnEndCall) {
         btnEndCall.addEventListener('click', () => {
             if (currentCallData) {
-                socket.emit('end-call', { callerId: currentCallData.callerId });
+                socket.emit('end-call', { callId: callSession.callId, callerId: currentCallData.callerId });
             }
             endCall();
             showToast('Appel termine', 'info');
@@ -2300,6 +2376,8 @@ function initCallSocket() {
         try {
             if (data.callId && currentCallData && data.callId !== currentCallData.callId) return;
             await peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
+            remoteDescriptionReady = true;
+            await flushPendingRemoteCandidates();
             callSession.status = 'connected';
         } catch (error) {
             console.error('Error setting remote description from answer:', error);
@@ -2310,7 +2388,12 @@ function initCallSocket() {
         if (!peerConnection || !data || !data.candidate) return;
         try {
             if (data.callId && currentCallData && data.callId !== currentCallData.callId) return;
-            await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+            const candidate = new RTCIceCandidate(data.candidate);
+            if (!remoteDescriptionReady) {
+                pendingRemoteCandidates.push(candidate);
+                return;
+            }
+            await peerConnection.addIceCandidate(candidate);
         } catch (error) {
             console.error('Error adding ICE candidate (citizen):', error);
         }

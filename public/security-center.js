@@ -824,7 +824,11 @@ let adminCallState = {
     peerConnection: null,
     localStream: null,
     pendingOffer: null,
-    callId: null
+    callId: null,
+    remoteDescriptionReady: false,
+    pendingRemoteCandidates: [],
+    answerSent: false,
+    answerInProgress: false
 };
 
 let ringtoneAudioContext = null;
@@ -920,6 +924,46 @@ async function loadWebrtcConfigAdmin() {
     }
 }
 
+// Wait until ICE gathering is complete (or the timeout expires) so the answer
+// we send already contains candidates. Trickle ICE stays enabled as fallback.
+function waitForIceGatheringAdmin(pc, timeoutMs = 2500) {
+    return new Promise((resolve) => {
+        if (!pc || pc.iceGatheringState === 'complete') {
+            resolve();
+            return;
+        }
+
+        let settled = false;
+        const finish = () => {
+            if (settled) return;
+            settled = true;
+            pc.removeEventListener('icegatheringstatechange', onStateChange);
+            clearTimeout(timer);
+            resolve();
+        };
+        const onStateChange = () => {
+            if (pc.iceGatheringState === 'complete') finish();
+        };
+
+        pc.addEventListener('icegatheringstatechange', onStateChange);
+        const timer = setTimeout(finish, timeoutMs);
+    });
+}
+
+async function flushPendingRemoteCandidatesAdmin() {
+    const pc = adminCallState.peerConnection;
+    if (!pc || !adminCallState.pendingRemoteCandidates.length) return;
+    const queued = adminCallState.pendingRemoteCandidates;
+    adminCallState.pendingRemoteCandidates = [];
+    for (const candidate of queued) {
+        try {
+            await pc.addIceCandidate(candidate);
+        } catch (error) {
+            console.warn('Error adding queued ICE candidate (admin):', error);
+        }
+    }
+}
+
 function createPeerConnectionAdmin() {
     if (!adminCallState.peerConnection) {
         adminCallState.peerConnection = new RTCPeerConnection(ICE_SERVERS_ADMIN);
@@ -927,6 +971,7 @@ function createPeerConnectionAdmin() {
         adminCallState.peerConnection.onicecandidate = (event) => {
             if (event.candidate) {
                 socket.emit('webrtc-ice-candidate', {
+                    callId: adminCallState.callId || adminCallState.incomingCall?.callId,
                     callerId: adminCallState.incomingCall?.callerId,
                     target: 'citizen',
                     candidate: event.candidate
@@ -935,8 +980,15 @@ function createPeerConnectionAdmin() {
         };
         
         adminCallState.peerConnection.ontrack = (event) => {
-            console.log('Remote track received:', event);
-            attachRemoteMediaStreamAdmin(event.streams[0]);
+            console.log('Remote track received:', event.track.kind);
+            const [stream] = event.streams;
+            if (stream) {
+                attachRemoteMediaStreamAdmin(stream);
+            } else {
+                if (!adminCallState.remoteStream) adminCallState.remoteStream = new MediaStream();
+                adminCallState.remoteStream.addTrack(event.track);
+                attachRemoteMediaStreamAdmin(adminCallState.remoteStream);
+            }
         };
         
         adminCallState.peerConnection.oniceconnectionstatechange = () => {
@@ -968,22 +1020,39 @@ function createPeerConnectionAdmin() {
 }
 
 function attachRemoteMediaStreamAdmin(stream) {
+    adminCallState.remoteStream = stream;
+    const isVideo = adminCallState.incomingCall && adminCallState.incomingCall.type === 'video';
     const remoteVideo = document.getElementById('remote-video');
     const remoteAudio = document.getElementById('remote-audio');
 
-    if (remoteVideo && stream) {
-        remoteVideo.srcObject = stream;
-        remoteVideo.muted = false;
-        remoteVideo.volume = 1;
-        remoteVideo.style.display = (adminCallState.incomingCall && adminCallState.incomingCall.type === 'video') ? 'block' : 'none';
-        remoteVideo.play().catch(() => console.log('Autoplay remote video blocked'));
-    }
-
-    if (remoteAudio && stream) {
-        remoteAudio.srcObject = stream;
-        remoteAudio.muted = false;
-        remoteAudio.volume = 1;
-        remoteAudio.play().catch(() => console.log('Autoplay remote audio blocked'));
+    // Never attach the same stream to both elements: the audio would be
+    // rendered twice (the <audio> tag keeps playing even when hidden).
+    if (isVideo) {
+        if (remoteAudio) {
+            remoteAudio.srcObject = null;
+            remoteAudio.muted = true;
+        }
+        if (remoteVideo) {
+            remoteVideo.srcObject = stream;
+            remoteVideo.muted = false;
+            remoteVideo.volume = 1;
+            remoteVideo.autoplay = true;
+            remoteVideo.playsInline = true;
+            remoteVideo.style.display = 'block';
+            remoteVideo.play().catch(() => console.log('Autoplay remote video blocked'));
+        }
+    } else {
+        if (remoteVideo) {
+            remoteVideo.srcObject = null;
+            remoteVideo.muted = true;
+            remoteVideo.style.display = 'none';
+        }
+        if (remoteAudio) {
+            remoteAudio.srcObject = stream;
+            remoteAudio.muted = false;
+            remoteAudio.volume = 1;
+            remoteAudio.play().catch(() => console.log('Autoplay remote audio blocked'));
+        }
     }
 }
 
@@ -997,7 +1066,10 @@ function updateCallStatus(text) {
 }
 
 async function handlePendingOffer() {
-    if (!adminCallState.pendingOffer) return;
+    const offer = adminCallState.pendingOffer;
+    if (!offer || !offer.sdp) return;
+    if (adminCallState.answerSent || adminCallState.answerInProgress) return;
+    adminCallState.answerInProgress = true;
     
     if (!adminCallState.peerConnection) {
         createPeerConnectionAdmin();
@@ -1005,20 +1077,32 @@ async function handlePendingOffer() {
     
     const pc = adminCallState.peerConnection;
     try {
+        if (pc.signalingState === 'closed') {
+            console.log('Peer connection closed, cannot answer');
+            return;
+        }
         if (pc.signalingState !== 'stable') {
             console.log('Skipping offer processing because signaling is not stable:', pc.signalingState);
             return;
         }
 
-        await pc.setRemoteDescription(new RTCSessionDescription(adminCallState.pendingOffer.sdp));
+        await pc.setRemoteDescription(new RTCSessionDescription(offer.sdp));
+        adminCallState.remoteDescriptionReady = true;
+        await flushPendingRemoteCandidatesAdmin();
+
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
-        const targetCallerId = adminCallState.pendingOffer.callerId || adminCallState.incomingCall?.callerId;
+        await waitForIceGatheringAdmin(pc);
+
+        adminCallState.answerSent = true;
+        adminCallState.pendingOffer = null;
+
+        const targetCallerId = offer.callerId || adminCallState.incomingCall?.callerId;
         socket.emit('webrtc-answer', {
-            callId: adminCallState.callId || adminCallState.pendingOffer.callId || targetCallerId,
+            callId: adminCallState.callId || offer.callId || targetCallerId,
             callerId: targetCallerId,
             calleeId: currentUser.id,
-            sdp: pc.localDescription
+            sdp: { type: pc.localDescription.type, sdp: pc.localDescription.sdp }
         });
         
         // Wait for connection to be established
@@ -1034,7 +1118,7 @@ async function handlePendingOffer() {
         
         // Fallback: update after 3 seconds if ICE hasn't reported yet
         setTimeout(() => {
-            if (pc.iceConnectionState === 'checking') {
+            if (pc.iceConnectionState === 'checking' || pc.iceConnectionState === 'new') {
                 updateCallStatus('Appel en cours');
             }
         }, 3000);
@@ -1043,7 +1127,7 @@ async function handlePendingOffer() {
         console.error('Error handling pending offer:', err);
         updateCallStatus('Erreur de connexion');
     } finally {
-        adminCallState.pendingOffer = null;
+        adminCallState.answerInProgress = false;
     }
 }
 
@@ -1196,7 +1280,7 @@ document.getElementById('btn-answer-call').addEventListener('click', async () =>
 
 document.getElementById('btn-reject-call').addEventListener('click', () => {
     if (adminCallState.incomingCall) {
-        socket.emit('reject-call', { callerId: adminCallState.incomingCall.callerId });
+        socket.emit('reject-call', { callId: adminCallState.callId, callerId: adminCallState.incomingCall.callerId });
     }
     document.getElementById('incoming-call-modal').classList.add('hidden');
     adminCallState.incomingCall = null;
@@ -1206,7 +1290,7 @@ document.getElementById('btn-reject-call').addEventListener('click', () => {
 
 document.getElementById('btn-end-call').addEventListener('click', () => {
     if (adminCallState.incomingCall) {
-        socket.emit('end-call', { callerId: adminCallState.incomingCall.callerId });
+        socket.emit('end-call', { callId: adminCallState.callId, callerId: adminCallState.incomingCall.callerId });
     }
     adminEndCall();
     stopRingtone();
@@ -1236,14 +1320,20 @@ function adminEndCall() {
     document.getElementById('incoming-call-modal').classList.add('hidden');
     document.getElementById('local-video').srcObject = null;
     document.getElementById('remote-video').srcObject = null;
+    document.getElementById('remote-audio').srcObject = null;
     adminCallState.incomingCall = null;
     adminCallState.pendingOffer = null;
     adminCallState.callId = null;
+    adminCallState.remoteStream = null;
+    adminCallState.remoteDescriptionReady = false;
+    adminCallState.pendingRemoteCandidates = [];
+    adminCallState.answerSent = false;
+    adminCallState.answerInProgress = false;
 }
 
 function rejectCall() {
     if (adminCallState.incomingCall) {
-        socket.emit('reject-call', { callerId: adminCallState.incomingCall.callerId });
+        socket.emit('reject-call', { callId: adminCallState.callId, callerId: adminCallState.incomingCall.callerId });
         adminCallState.incomingCall = null;
     }
 }
@@ -1362,7 +1452,7 @@ function initSocket() {
     
     // WebRTC signaling for calls (audio + video)
     socket.on('webrtc-offer', async (data) => {
-        console.log('WebRTC offer received:', data);
+        console.log('WebRTC offer received');
         adminCallState.callId = data.callId || adminCallState.callId;
         if (!adminCallState.pendingOffer || adminCallState.pendingOffer.callerId !== data.callerId || adminCallState.pendingOffer.callId !== data.callId) {
             adminCallState.pendingOffer = data;
@@ -1376,18 +1466,26 @@ function initSocket() {
         if (adminCallState.peerConnection && data.callId === adminCallState.callId) {
             if (adminCallState.peerConnection.signalingState === 'have-local-offer' || adminCallState.peerConnection.signalingState === 'have-remote-offer') {
                 await adminCallState.peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
+                adminCallState.remoteDescriptionReady = true;
+                await flushPendingRemoteCandidatesAdmin();
                 console.log('Remote description set from answer (admin)');
             }
         }
     });
     
     socket.on('webrtc-ice-candidate', async (data) => {
-        if (adminCallState.peerConnection && data.candidate && data.callId === adminCallState.callId) {
-            try {
-                await adminCallState.peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
-            } catch (e) {
-                console.error('Error adding ICE candidate (admin):', e);
+        const pc = adminCallState.peerConnection;
+        if (!pc || !data || !data.candidate) return;
+        if (data.callId && adminCallState.callId && data.callId !== adminCallState.callId) return;
+        try {
+            const candidate = new RTCIceCandidate(data.candidate);
+            if (!adminCallState.remoteDescriptionReady) {
+                adminCallState.pendingRemoteCandidates.push(candidate);
+                return;
             }
+            await pc.addIceCandidate(candidate);
+        } catch (e) {
+            console.error('Error adding ICE candidate (admin):', e);
         }
     });
 
