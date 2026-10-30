@@ -80,12 +80,41 @@ const CITIES = {
         minLng: 29.35,
         maxLng: 29.65,
         quartiers: [
-            { name: "Mabanga", lat: 0.491, lng: 29.473 },
-            { name: "Ruwenzori", lat: 0.495, lng: 29.475 },
-            { name: "Boikene", lat: 0.488, lng: 29.470 },
-            { name: "Kisinja", lat: 0.493, lng: 29.478 },
-            { name: "Vulungera", lat: 0.486, lng: 29.468 },
-            { name: "Oicha", lat: 0.500, lng: 29.480 }
+            // Commune de Beu
+            { name: "Biautu", lat: 0.491, lng: 29.473 },
+            { name: "Lyakobo", lat: 0.492, lng: 29.474 },
+            { name: "Benengule", lat: 0.490, lng: 29.472 },
+            { name: "Malepe", lat: 0.493, lng: 29.475 },
+            { name: "Butanuka", lat: 0.489, lng: 29.471 },
+            { name: "Rwangoma", lat: 0.494, lng: 29.476 },
+            { name: "Lubahemba", lat: 0.488, lng: 29.470 },
+            // Commune de Bungulu
+            { name: "Cité Belge", lat: 0.4915, lng: 29.4735 },
+            { name: "Kanzulinzuli", lat: 0.4925, lng: 29.4745 },
+            { name: "Mabolio", lat: 0.4905, lng: 29.4725 },
+            { name: "Mambango", lat: 0.4935, lng: 29.4755 },
+            { name: "Mukulya", lat: 0.4895, lng: 29.4715 },
+            { name: "Mukungia", lat: 0.4895, lng: 29.4715 },
+            { name: "Pasisi", lat: 0.4945, lng: 29.4765 },
+            { name: "Résidentiel", lat: 0.4885, lng: 29.4705 },
+            // Commune de Mulekera
+            { name: "Masiani", lat: 0.491, lng: 29.472 },
+            { name: "Matembo", lat: 0.492, lng: 29.473 },
+            { name: "Bundji", lat: 0.490, lng: 29.471 },
+            { name: "Butsili", lat: 0.493, lng: 29.474 },
+            { name: "Kasanga-Tuha", lat: 0.489, lng: 29.470 },
+            { name: "Kalinda", lat: 0.494, lng: 29.475 },
+            { name: "Matonge", lat: 0.488, lng: 29.469 },
+            { name: "Ngongolio", lat: 0.495, lng: 29.476 },
+            { name: "Tamende", lat: 0.487, lng: 29.468 },
+            { name: "Sayo", lat: 0.496, lng: 29.477 },
+            // Commune de Ruwenzori
+            { name: "Ngadi", lat: 0.495, lng: 29.475 },
+            { name: "Kasabinyole", lat: 0.496, lng: 29.476 },
+            { name: "Boikene", lat: 0.494, lng: 29.474 },
+            { name: "Paida", lat: 0.497, lng: 29.477 },
+            { name: "Mabakanga", lat: 0.493, lng: 29.473 },
+            { name: "Nzuma", lat: 0.498, lng: 29.478 }
         ]
     }
 };
