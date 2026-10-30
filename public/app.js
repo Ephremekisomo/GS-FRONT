@@ -70,6 +70,23 @@ const CITIES = {
             { name: "Maluku", lat: -4.410, lng: 15.280 },
             { name: "Kinshasa Centre", lat: -4.328, lng: 15.314 }
         ]
+    },
+    'Beni': {
+        nom: 'Beni',
+        lat: 0.491130,
+        lng: 29.473060,
+        minLat: 0.35,
+        maxLat: 0.65,
+        minLng: 29.35,
+        maxLng: 29.65,
+        quartiers: [
+            { name: "Mabanga", lat: 0.491, lng: 29.473 },
+            { name: "Ruwenzori", lat: 0.495, lng: 29.475 },
+            { name: "Boikene", lat: 0.488, lng: 29.470 },
+            { name: "Kisinja", lat: 0.493, lng: 29.478 },
+            { name: "Vulungera", lat: 0.486, lng: 29.468 },
+            { name: "Oicha", lat: 0.500, lng: 29.480 }
+        ]
     }
 };
 
